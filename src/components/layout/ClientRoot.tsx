@@ -5,9 +5,10 @@ import { usePlayer } from "@/lib/player-context";
 import type { ReactNode } from "react";
 
 function AppContent({ children }: { children: ReactNode }) {
-  const { player } = usePlayer();
-  // Block the entire app until a player is chosen
-  if (!player) return null;
+  const { player, hydrated } = usePlayer();
+  // During SSR (hydrated=false): render nothing but let the route exist
+  // After hydration: show app only when player is chosen
+  if (!hydrated || !player) return null;
   return <>{children}</>;
 }
 

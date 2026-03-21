@@ -15,6 +15,7 @@ interface PlayerCtx {
   player: Player | null;
   setPlayer: (p: Player) => void;
   isSelecting: boolean;
+  hydrated: boolean;
   openSelector: () => void;
   closeSelector: () => void;
 }
@@ -23,6 +24,7 @@ const Ctx = createContext<PlayerCtx>({
   player: null,
   setPlayer: () => {},
   isSelecting: false,
+  hydrated: false,
   openSelector: () => {},
   closeSelector: () => {},
 });
@@ -49,10 +51,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const openSelector = useCallback(() => setIsSelecting(true), []);
   const closeSelector = useCallback(() => setIsSelecting(false), []);
 
-  if (!hydrated) return null;
-
+  // Always render children — never return null during SSR
+  // Hydration state is exposed via context for consumers to gate themselves
   return (
-    <Ctx.Provider value={{ player, setPlayer, isSelecting, openSelector, closeSelector }}>
+    <Ctx.Provider value={{ player, setPlayer, isSelecting, hydrated, openSelector, closeSelector }}>
       {children}
     </Ctx.Provider>
   );

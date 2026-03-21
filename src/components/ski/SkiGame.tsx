@@ -1,5 +1,7 @@
 "use client";
 import { useRef, useEffect, useState, useCallback } from "react";
+import { usePlayer } from "@/lib/player-context";
+import { PLAYERS } from "@/data/players";
 
 // ─────────────────────────────────────────────
 // TYPES
@@ -277,7 +279,17 @@ function drawFlag(ctx: CanvasRenderingContext2D, x: number, y: number) {
   ctx.restore();
 }
 
-function drawRaph(ctx: CanvasRenderingContext2D, x: number, y: number, vx: number, onGround: boolean, t: number) {
+// Skier character — colored with the selected player's color
+function drawSkier(
+  ctx: CanvasRenderingContext2D,
+  x: number, y: number,
+  vx: number,
+  onGround: boolean,
+  t: number,
+  helmetColor: string,
+  bodyColor: string,
+  playerEmoji: string,
+) {
   ctx.save();
   ctx.translate(x, y);
 
@@ -290,26 +302,95 @@ function drawRaph(ctx: CanvasRenderingContext2D, x: number, y: number, vx: numbe
   ctx.ellipse(0, RADIUS + 2, RADIUS + 2, 4, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Skis
+  // Skis (player color)
   const skipBob = onGround ? Math.sin(t * 0.2) * 0.5 : 0;
-  ctx.fillStyle = "#85C1E9";
+  ctx.fillStyle = helmetColor;
+  ctx.globalAlpha = 0.9;
   ctx.beginPath();
   ctx.roundRect(-18, RADIUS - 2 + skipBob, 36, 5, 2);
   ctx.fill();
+  ctx.globalAlpha = 1;
 
-  // Body
-  ctx.fillStyle = "#2D6A3F"; // green jacket
+  // Body (player body color)
+  ctx.fillStyle = bodyColor;
   ctx.beginPath();
   ctx.roundRect(-7, -RADIUS + 4, 14, 18, 4);
   ctx.fill();
 
-  // Scarf
-  ctx.fillStyle = "#FF6B6B";
+  // Scarf (white)
+  ctx.fillStyle = "#fff";
   ctx.beginPath();
   ctx.roundRect(-7, -RADIUS + 10, 14, 4, 2);
   ctx.fill();
 
-  // Head (helmet)
+  // Helmet (player helmet color)
+  ctx.fillStyle = helmetColor;
+  ctx.beginPath();
+  ctx.arc(0, -RADIUS + 1, 9, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Goggles
+  ctx.fillStyle = "#1A2B3C";
+  ctx.beginPath();
+  ctx.arc(0, -RADIUS + 3, 5, -0.8, Math.PI + 0.8);
+  ctx.fill();
+  ctx.fillStyle = "rgba(255,255,255,0.35)";
+  ctx.beginPath();
+  ctx.arc(0, -RADIUS + 3, 3.5, -0.8, Math.PI + 0.8);
+  ctx.fill();
+
+  // Emoji name badge (tiny)
+  ctx.font = "10px serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(playerEmoji, 0, -RADIUS - 10);
+
+  // Pole
+  ctx.strokeStyle = "#94A3B8";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(8, -RADIUS + 8);
+  ctx.lineTo(18, RADIUS - 4);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+// Raph as guide — standing at the finish, waving
+function drawRaphGuide(ctx: CanvasRenderingContext2D, x: number, y: number, t: number) {
+  ctx.save();
+  ctx.translate(x, y);
+
+  // Wave arm animation
+  const wave = Math.sin(t * 0.15) * 0.5;
+
+  // Shadow
+  ctx.fillStyle = "rgba(0,0,0,0.12)";
+  ctx.beginPath();
+  ctx.ellipse(0, RADIUS + 2, RADIUS + 2, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Skis (Raph blue)
+  ctx.fillStyle = "#85C1E9";
+  ctx.beginPath();
+  ctx.roundRect(-18, RADIUS - 2, 36, 5, 2);
+  ctx.fill();
+
+  // Body (Raph green jacket)
+  ctx.fillStyle = "#2D6A3F";
+  ctx.beginPath();
+  ctx.roundRect(-7, -RADIUS + 4, 14, 18, 4);
+  ctx.fill();
+
+  // Waving arm
+  ctx.save();
+  ctx.translate(-7, -RADIUS + 6);
+  ctx.rotate(wave - 1.2);
+  ctx.fillStyle = "#2D6A3F";
+  ctx.fillRect(-2, -12, 4, 12);
+  ctx.restore();
+
+  // Helmet (Raph orange)
   ctx.fillStyle = "#E8804A";
   ctx.beginPath();
   ctx.arc(0, -RADIUS + 1, 9, 0, Math.PI * 2);
@@ -325,13 +406,16 @@ function drawRaph(ctx: CanvasRenderingContext2D, x: number, y: number, vx: numbe
   ctx.arc(0, -RADIUS + 3, 3.5, -0.8, Math.PI + 0.8);
   ctx.fill();
 
-  // Pole
-  ctx.strokeStyle = "#94A3B8";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(8, -RADIUS + 8);
-  ctx.lineTo(18, RADIUS - 4);
-  ctx.stroke();
+  // "Raph" label
+  ctx.fillStyle = "#85C1E9";
+  ctx.font = "bold 9px system-ui";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("Raph", 0, -RADIUS - 12);
+
+  // Map emoji
+  ctx.font = "12px serif";
+  ctx.fillText("🗺️", 0, -RADIUS - 22);
 
   ctx.restore();
 }
@@ -383,6 +467,18 @@ interface SkiGameProps {
 }
 
 export function SkiGame({ onBack }: SkiGameProps) {
+  const { player, openSelector } = usePlayer();
+
+  // Resolve player display — Raph defaults to Raph player data
+  const raphPlayer = PLAYERS.find((p) => p.id === "raph")!;
+  const activePlayer = player ?? raphPlayer;
+
+  // Two-tone: helmet = player color, body = darker variant
+  const helmetColor = activePlayer.color;
+  const bodyColor   = activePlayer.color + "BB"; // slightly transparent for jacket feel
+  const playerEmoji = activePlayer.emoji;
+  const playerName  = activePlayer.name;
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stateRef = useRef({
     phase: "drawing" as Phase,
@@ -677,8 +773,13 @@ export function SkiGame({ onBack }: SkiGameProps) {
       }
       ctx.restore();
 
-      // Raph
-      drawRaph(ctx, s.px - s.camX, s.py, s.vx, s.phase === "running", s.t);
+      // Raph waiting at finish
+      if (s.level) {
+        drawRaphGuide(ctx, s.level.endX - s.camX - 32, s.level.endY - RADIUS, s.t);
+      }
+
+      // Player skier
+      drawSkier(ctx, s.px - s.camX, s.py, s.vx, s.phase === "running", s.t, helmetColor, bodyColor, playerEmoji);
 
       // Crevasse danger indicators (small arrows pointing up from gaps)
       if (s.phase === "drawing" && s.level) {
@@ -725,7 +826,7 @@ export function SkiGame({ onBack }: SkiGameProps) {
         ctx.fillText("CREVASSE !", W / 2, H / 2 - 30);
         ctx.fillStyle = "#F0F4F8";
         ctx.font = `${Math.round(W / 18)}px system-ui`;
-        ctx.fillText("Raph est tombé... Redessine !", W / 2, H / 2 + 10);
+        ctx.fillText(`${playerName} est tombé${activePlayer.id === "emili" ? "e" : ""} !`, W / 2, H / 2 + 10);
         ctx.restore();
       }
 
@@ -741,7 +842,7 @@ export function SkiGame({ onBack }: SkiGameProps) {
         ctx.font = `bold ${Math.round(W / 6.5)}px system-ui`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText("ARRIVÉE ! 🏔️", 0, 0);
+        ctx.fillText("T'as suivi Raph ! 🏔️", 0, 0);
         ctx.restore();
         ctx.fillStyle = "#4CAF82";
         ctx.font = `bold ${Math.round(W / 16)}px system-ui`;
@@ -776,13 +877,26 @@ export function SkiGame({ onBack }: SkiGameProps) {
             Niveau {levelIdx + 1}/{stateRef.current.levels?.length ?? 3}
           </p>
         </div>
-        <div className="text-right">
-          <p className="text-snow text-xs font-semibold">⭐ {score}/{totalStars}</p>
-          {uiPhase === "drawing" && (
-            <p className="text-mist text-[10px]">
-              {lineCount} ligne{lineCount > 1 ? "s" : ""} dessinée{lineCount > 1 ? "s" : ""}
-            </p>
-          )}
+        <div className="flex items-center gap-3">
+          {/* Player badge */}
+          <button
+            onClick={openSelector}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl border active:scale-95"
+            style={{ borderColor: activePlayer.color + "66", backgroundColor: activePlayer.color + "22" }}
+          >
+            <span className="text-sm">{playerEmoji}</span>
+            <span className="text-xs font-semibold" style={{ color: activePlayer.color }}>
+              {playerName}
+            </span>
+          </button>
+          <div className="text-right">
+            <p className="text-snow text-xs font-semibold">⭐ {score}/{totalStars}</p>
+            {uiPhase === "drawing" && (
+              <p className="text-mist text-[10px]">
+                {lineCount} ligne{lineCount > 1 ? "s" : ""}
+              </p>
+            )}
+          </div>
         </div>
       </div>
 
@@ -790,7 +904,7 @@ export function SkiGame({ onBack }: SkiGameProps) {
       {uiPhase === "drawing" && levelDef?.hint && (
         <div className="w-full bg-glacier/10 border-b border-glacier/20 px-4 py-1.5">
           <p className="text-glacier text-xs text-center font-accent italic">
-            💡 {levelDef.hint}
+            💡 {levelDef.hint} — rejoins Raph 🗺️
           </p>
         </div>
       )}
@@ -825,7 +939,7 @@ export function SkiGame({ onBack }: SkiGameProps) {
               onClick={launchRaph}
               className="flex-1 py-2.5 rounded-xl bg-glacier text-alpine-dark font-heading text-xl tracking-wide active:scale-95"
             >
-              🎿 Envoyer Raph !
+              🎿 C'est parti {playerName} !
             </button>
           </>
         )}

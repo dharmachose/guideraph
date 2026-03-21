@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { ClientRoot } from "@/components/layout/ClientRoot";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -42,7 +43,9 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="antialiased">{children}</body>
+      <body className="antialiased">
+        <ClientRoot>{children}</ClientRoot>
+      </body>
     </html>
   );
 }

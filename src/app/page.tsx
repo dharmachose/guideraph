@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AppShell } from "@/components/layout/AppShell";
 import { MountainSVG } from "@/components/layout/MountainSVG";
+import { PlayerBadge } from "@/components/layout/PlayerBadge";
 import { PLAYERS } from "@/data/players";
 
 const GAMES = [
@@ -71,14 +72,17 @@ export default function HomePage() {
               {PLAYERS.map((p) => (
                 <div
                   key={p.id}
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-alpine-dark"
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-alpine-dark"
                   style={{ backgroundColor: p.color }}
                   title={p.name}
                 >
-                  {p.name[0]}
+                  {p.emoji}
                 </div>
               ))}
             </div>
+
+            {/* Current player badge */}
+            <PlayerBadge />
           </div>
         </div>
 

@@ -1,0 +1,127 @@
+@import "tailwindcss";
+
+@theme {
+  /* Colors */
+  --color-alpine-dark: #0F1923;
+  --color-alpine-mid: #1A2B3C;
+  --color-alpine-light: #243547;
+  --color-glacier: #5EADD4;
+  --color-glacier-light: #8DCAE8;
+  --color-glacier-dark: #3D8BB5;
+  --color-alpen-glow: #E8804A;
+  --color-alpen-light: #F0A070;
+  --color-summit: #4CAF82;
+  --color-snow: #F0F4F8;
+  --color-mist: #94A3B8;
+  --color-player-flix: #FF6B6B;
+  --color-player-hadri: #4ECDC4;
+  --color-player-emili: #FFE66D;
+  --color-player-momo: #A8E6CF;
+  --color-player-nico: #C3B1E1;
+  --color-player-chose: #FF8B94;
+  --color-player-raph: #85C1E9;
+
+  /* Fonts */
+  --font-heading: 'Bebas Neue', Impact, sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-accent: 'Playfair Display', Georgia, serif;
+
+  /* Animations */
+  --animate-stamp: stamp 0.3s ease-out forwards;
+  --animate-card-reveal: slideUp 0.4s ease-out;
+  --animate-bounce-in: bounceIn 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+  --animate-snowfall: snowfall 3s linear infinite;
+  --animate-fade-in: fadeIn 0.3s ease-out;
+
+  @keyframes stamp {
+    0% { transform: scale(1.5) rotate(-10deg); opacity: 0; }
+    100% { transform: scale(1) rotate(-3deg); opacity: 1; }
+  }
+  @keyframes slideUp {
+    0% { transform: translateY(20px); opacity: 0; }
+    100% { transform: translateY(0); opacity: 1; }
+  }
+  @keyframes bounceIn {
+    0% { transform: scale(0.3); opacity: 0; }
+    50% { transform: scale(1.1); }
+    70% { transform: scale(0.9); }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  @keyframes snowfall {
+    0% { transform: translateY(-10px) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+  }
+  @keyframes fadeIn {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+  }
+}
+
+:root {
+  --bg-base: #0F1923;
+}
+
+html {
+  height: -webkit-fill-available;
+}
+
+body {
+  background-color: var(--bg-base);
+  color: #F0F4F8;
+  min-height: 100dvh;
+  min-height: -webkit-fill-available;
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+/* Card flip animation */
+.card-flip-container {
+  perspective: 1000px;
+}
+
+.card-flip-inner {
+  transform-style: preserve-3d;
+  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card-flip-inner.flipped {
+  transform: rotateY(180deg);
+}
+
+.card-face {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.card-face-back {
+  transform: rotateY(180deg);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #243547;
+  border-radius: 2px;
+}
+
+/* Safe area for notched phones */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Snowflake particles for celebrations */
+.snowflake {
+  position: fixed;
+  top: -10px;
+  animation: snowfall linear infinite;
+  pointer-events: none;
+  user-select: none;
+  z-index: 9999;
+}

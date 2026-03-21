@@ -538,7 +538,8 @@ export function SkiGame({ onBack }: SkiGameProps) {
   useEffect(() => {
     function measure() {
       const w = Math.min(window.innerWidth, 600);
-      const h = Math.round(w * 0.72);
+      // Terrain y-values go up to ~460px — need at least 500px height to be visible
+      const h = Math.max(500, Math.round(w * 0.84));
       setCanvasSize({ w, h });
     }
     measure();

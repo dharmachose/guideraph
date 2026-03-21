@@ -9,21 +9,21 @@ import { shuffle } from "@/lib/shuffle";
 const STORAGE_KEY = "raph-quiz-v1";
 const POINTS_CORRECT = 3;
 
-function createInitialState(): QuizGameState {
+function createInitialState(startPlayerIndex = 0): QuizGameState {
   return {
     questionOrder: shuffle(QUIZ_QUESTIONS.map((_, i) => i)),
     currentQuestionIndex: 0,
     scores: Object.fromEntries(PLAYERS.map((p) => [p.id, 0])),
-    currentPlayerIndex: 0,
+    currentPlayerIndex: startPlayerIndex,
     isFinished: false,
     givenAnswers: {},
   };
 }
 
-export function useQuizGame() {
+export function useQuizGame(startPlayerIndex = 0) {
   const [state, setState] = useLocalStorage<QuizGameState>(
     STORAGE_KEY,
-    createInitialState()
+    createInitialState(startPlayerIndex)
   );
 
   const currentQuestion = useMemo(() => {
@@ -74,8 +74,8 @@ export function useQuizGame() {
   }, [setState]);
 
   const resetGame = useCallback(() => {
-    setState(createInitialState());
-  }, [setState]);
+    setState(createInitialState(startPlayerIndex));
+  }, [setState, startPlayerIndex]);
 
   const sortedScores = useMemo(() => {
     return PLAYERS.map((p) => ({

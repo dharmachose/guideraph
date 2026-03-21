@@ -8,15 +8,18 @@ import { BingoBoard } from "@/components/bingo/BingoBoard";
 import { BingoWinModal } from "@/components/bingo/BingoWinModal";
 import { useBingoGame } from "@/hooks/useBingoGame";
 import { PLAYERS, PLAYER_MAP } from "@/data/players";
+import { usePlayer } from "@/lib/player-context";
 import { checkBingoWin } from "@/lib/bingo-utils";
 import { cn } from "@/lib/cn";
 
 export default function BingoPage() {
+  const { player } = usePlayer();
   const { state, checkCell, resetGame, getCheckedSet, getWinLines } =
     useBingoGame();
-  const [activePlayerId, setActivePlayerId] = useState(PLAYERS[0].id);
+  const [activePlayerId, setActivePlayerId] = useState(player?.id ?? PLAYERS[0].id);
   const [celebratingWinner, setCelebratingWinner] = useState<string | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+
 
   const activePlayer = PLAYER_MAP[activePlayerId];
   const activeCard = state.cards[activePlayerId] ?? [];

@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { useQuizGame } from "@/hooks/useQuizGame";
+import { usePlayer } from "@/lib/player-context";
+import { PLAYERS } from "@/data/players";
 import { cn } from "@/lib/cn";
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -27,6 +29,8 @@ const PODIUM_COMMENTS = [
 ];
 
 export default function QuizPage() {
+  const { player } = usePlayer();
+  const startPlayerIndex = PLAYERS.findIndex((p) => p.id === player?.id);
   const {
     state,
     currentQuestion,
@@ -37,7 +41,7 @@ export default function QuizPage() {
     sortedScores,
     progress,
     givenAnswer,
-  } = useQuizGame();
+  } = useQuizGame(startPlayerIndex >= 0 ? startPlayerIndex : 0);
 
   const [localAnswer, setLocalAnswer] = useState<string | null>(null);
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);

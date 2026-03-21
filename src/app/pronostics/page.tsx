@@ -6,12 +6,14 @@ import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { usePronosticsGame } from "@/hooks/usePronosticsGame";
 import { PLAYERS } from "@/data/players";
+import { usePlayer } from "@/lib/player-context";
 import { PRONOSTIC_QUESTIONS } from "@/data/pronostics";
 
 export default function PronosticsPage() {
+  const { player } = usePlayer();
   const { state, setAnswer, getAnswer, resolveQuestion, toggleReveal, resetGame } =
     usePronosticsGame();
-  const [activePlayerId, setActivePlayerId] = useState(PLAYERS[0].id);
+  const [activePlayerId, setActivePlayerId] = useState(player?.id ?? PLAYERS[0].id);
   const [resolveModal, setResolveModal] = useState<string | null>(null);
   const [resolveValue, setResolveValue] = useState("");
   const [showResetConfirm, setShowResetConfirm] = useState(false);

@@ -4,9 +4,9 @@ import { usePlayer } from "@/lib/player-context";
 import { cn } from "@/lib/cn";
 
 export function PlayerSelector() {
-  const { player, setPlayer, isSelecting, closeSelector } = usePlayer();
+  const { player, setPlayer, isSelecting, hydrated, closeSelector } = usePlayer();
 
-  if (!isSelecting) return null;
+  if (!hydrated || !isSelecting) return null;
 
   const isChangeMode = !!player; // already selected once = "change" mode
 

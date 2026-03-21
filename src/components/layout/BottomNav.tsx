@@ -8,6 +8,7 @@ const TABS = [
   { href: "/bingo", label: "Bingo Rando", icon: "🎯", short: "Bingo" },
   { href: "/defis", label: "Défis", icon: "🃏", short: "Défis" },
   { href: "/quiz", label: "Quiz", icon: "🏔️", short: "Quiz" },
+  { href: "/ski", label: "Ski", icon: "🎿", short: "Ski" },
 ];
 
 export function BottomNav() {

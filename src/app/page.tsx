@@ -40,6 +40,15 @@ const GAMES = [
     accent: "#4CAF82",
     badge: "Soirée",
   },
+  {
+    href: "/ski",
+    icon: "🎿",
+    title: "Ski avec Raph",
+    description:
+      "Dessine la ligne pour guider Raph au-dessus des crevasses. 3 niveaux de difficulté croissante.",
+    accent: "#FFE66D",
+    badge: "Mini-jeu",
+  },
 ];
 
 export default function HomePage() {

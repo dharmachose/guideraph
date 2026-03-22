@@ -6,48 +6,39 @@ import { PLAYERS } from "@/data/players";
 
 const GAMES = [
   {
-    href: "/pronostics",
-    icon: "🔮",
-    title: "Pronostics",
+    href: "/ski/dva",
+    icon: "📡",
+    title: "DVA Search",
     description:
-      "Faites vos prédictions avant le séjour. Qui se plaindra en premier\u202f? On vérifie au refuge.",
-    accent: "#C3B1E1",
-    badge: "Avant le trip",
-  },
-  {
-    href: "/bingo",
-    icon: "🎯",
-    title: "Bingo Rando",
-    description:
-      "Chaque joueur a sa carte bingo personnalisée avec les événements inévitables du séjour. BINGO\u202f!",
+      "Glisse ton DVA sur la neige pour localiser tes potes ensevelis. Sauve-les tous le plus vite possible\u202f!",
     accent: "#5EADD4",
-    badge: "Semaine entière",
+    badge: "Mini-jeu",
   },
   {
-    href: "/defis",
-    icon: "🃏",
-    title: "Défis Rando",
-    description:
-      "Piochez une carte et relevez le défi\u202f: sur la piste, au refuge, ou en groupe.",
-    accent: "#E8804A",
-    badge: "Soirée",
-  },
-  {
-    href: "/quiz",
+    href: "/ski/avalanche",
     icon: "🏔️",
-    title: "Quiz Montagne",
+    title: "Évite l'Avalanche",
     description:
-      "Vanoise, technique, et des questions sur le groupe. +3 points par bonne réponse.",
-    accent: "#4CAF82",
-    badge: "Soirée",
+      "Descente sous pression\u202f: esquive les blocs d'avalanche qui tombent. 3 vies, vitesse croissante.",
+    accent: "#E8804A",
+    badge: "Mini-jeu",
   },
   {
-    href: "/ski",
-    icon: "🎿",
-    title: "Ski avec Raph",
+    href: "/ski/guide",
+    icon: "🗺️",
+    title: "Suit Raph le Guide",
     description:
-      "Dessine la ligne pour guider Raph au-dessus des crevasses. 3 niveaux de difficulté croissante.",
-    accent: "#FFE66D",
+      "Raph trace son chemin dans la neige. Mémorise-le, il disparaît, puis reproduis-le\u202f! 3 manches.",
+    accent: "#85C1E9",
+    badge: "Mini-jeu",
+  },
+  {
+    href: "/ski/crevasse",
+    icon: "⚡",
+    title: "Crevo-Hop",
+    description:
+      "Le skieur avance, les crevasses arrivent. TAP pour sauter au bon moment\u202f! Rythme qui s'accélère.",
+    accent: "#4CAF82",
     badge: "Mini-jeu",
   },
 ];

@@ -30,7 +30,7 @@ interface LevelDef {
 const GRAVITY   = 0.40;
 const FRICTION  = 0.993;
 const RADIUS    = 11;
-const DEATH_Y   = 560;
+const DEATH_Y   = 600;
 const WIN_DIST  = 30;
 const MAX_VX    = 16;
 const STAR_R    = 14;
@@ -46,51 +46,51 @@ function buildLevels(): LevelDef[] {
       worldWidth: 2200,
       terrain: [
         { x1: -200, y1: 345, x2: 480,  y2: 400 },
-        // gap 480-640
-        { x1: 640,  y1: 390, x2: 1100, y2: 435 },
-        // gap 1100-1280
-        { x1: 1280, y1: 425, x2: 1880, y2: 455 },
-        // gap 1880-2040
-        { x1: 2040, y1: 445, x2: 2500, y2: 445 },
+        // gap 480-640  (next seg LOWER: 410 > 400 ✓)
+        { x1: 640,  y1: 410, x2: 1100, y2: 450 },
+        // gap 1100-1280 (460 > 450 ✓)
+        { x1: 1280, y1: 460, x2: 1880, y2: 475 },
+        // gap 1880-2040 (478 > 475 ✓)
+        { x1: 2040, y1: 478, x2: 2500, y2: 478 },
       ],
       startX: 90, startY: 322,
-      endX: 2150, endY: 425,
+      endX: 2150, endY: 478,
       trees: [
-        { x: 220, y: 400 }, { x: 780, y: 435 }, { x: 1550, y: 455 },
-        { x: 2120, y: 445 },
+        { x: 220, y: 379 }, { x: 780, y: 422 }, { x: 1550, y: 467 },
+        { x: 2120, y: 478 },
       ],
       stars: [
-        { x: 290, y: 375, collected: false },
-        { x: 860, y: 413, collected: false },
-        { x: 1570, y: 432, collected: false },
+        { x: 290, y: 363, collected: false },
+        { x: 860, y: 407, collected: false },
+        { x: 1570, y: 445, collected: false },
       ],
     },
     {
       name: "Couloir du Guide",
-      hint: "Plusieurs crevasses — trace le chemin avant de skier",
+      hint: "Plusieurs crevasses — dessine les ponts vite !",
       worldWidth: 2800,
       terrain: [
-        { x1: -200, y1: 310, x2: 400,  y2: 375 },
-        // gap 400-590
-        { x1: 590,  y1: 363, x2: 960,  y2: 418 },
-        // gap 960-1170
-        { x1: 1170, y1: 408, x2: 1550, y2: 448 },
-        // gap 1550-1760
-        { x1: 1760, y1: 440, x2: 2180, y2: 458 },
-        // gap 2180-2370
-        { x1: 2370, y1: 450, x2: 3000, y2: 450 },
+        { x1: -200, y1: 310, x2: 400,  y2: 370 },
+        // gap 400-590  (380 > 370 ✓)
+        { x1: 590,  y1: 380, x2: 960,  y2: 420 },
+        // gap 960-1170 (430 > 420 ✓)
+        { x1: 1170, y1: 430, x2: 1550, y2: 455 },
+        // gap 1550-1760 (462 > 455 ✓)
+        { x1: 1760, y1: 462, x2: 2180, y2: 475 },
+        // gap 2180-2370 (478 > 475 ✓)
+        { x1: 2370, y1: 478, x2: 3000, y2: 478 },
       ],
       startX: 90, startY: 285,
-      endX: 2700, endY: 428,
+      endX: 2700, endY: 478,
       trees: [
-        { x: 180, y: 375 }, { x: 680, y: 418 }, { x: 1300, y: 448 },
-        { x: 1860, y: 458 }, { x: 2500, y: 450 },
+        { x: 180, y: 348 }, { x: 680, y: 390 }, { x: 1300, y: 439 },
+        { x: 1860, y: 465 }, { x: 2500, y: 478 },
       ],
       stars: [
-        { x: 240, y: 353, collected: false },
-        { x: 740, y: 396, collected: false },
-        { x: 1350, y: 426, collected: false },
-        { x: 1860, y: 437, collected: false },
+        { x: 240, y: 332, collected: false },
+        { x: 740, y: 374, collected: false },
+        { x: 1350, y: 420, collected: false },
+        { x: 1860, y: 443, collected: false },
       ],
     },
     {
@@ -98,30 +98,30 @@ function buildLevels(): LevelDef[] {
       hint: "La ligne de Raph. Ne le laisse pas tomber !",
       worldWidth: 3400,
       terrain: [
-        { x1: -200, y1: 270, x2: 350,  y2: 348 },
-        // big gap 350-580
-        { x1: 580,  y1: 336, x2: 860,  y2: 385 },
-        // gap 860-1080
-        { x1: 1080, y1: 374, x2: 1420, y2: 420 },
-        // gap 1420-1640
-        { x1: 1640, y1: 410, x2: 2000, y2: 448 },
-        // gap 2000-2230
-        { x1: 2230, y1: 440, x2: 2620, y2: 458 },
-        // gap 2620-2840
-        { x1: 2840, y1: 450, x2: 3600, y2: 450 },
+        { x1: -200, y1: 270, x2: 350,  y2: 340 },
+        // gap 350-580  (350 > 340 ✓)
+        { x1: 580,  y1: 350, x2: 860,  y2: 390 },
+        // gap 860-1080 (400 > 390 ✓)
+        { x1: 1080, y1: 400, x2: 1420, y2: 430 },
+        // gap 1420-1640 (440 > 430 ✓)
+        { x1: 1640, y1: 440, x2: 2000, y2: 460 },
+        // gap 2000-2230 (465 > 460 ✓)
+        { x1: 2230, y1: 465, x2: 2620, y2: 475 },
+        // gap 2620-2840 (478 > 475 ✓)
+        { x1: 2840, y1: 478, x2: 3600, y2: 478 },
       ],
       startX: 90, startY: 245,
-      endX: 3280, endY: 428,
+      endX: 3280, endY: 478,
       trees: [
-        { x: 200, y: 348 }, { x: 660, y: 385 }, { x: 1230, y: 420 },
-        { x: 1740, y: 448 }, { x: 2380, y: 458 }, { x: 3000, y: 450 },
+        { x: 200, y: 321 }, { x: 660, y: 361 }, { x: 1230, y: 413 },
+        { x: 1740, y: 446 }, { x: 2380, y: 469 }, { x: 3000, y: 478 },
       ],
       stars: [
-        { x: 200, y: 325, collected: false },
-        { x: 700, y: 362, collected: false },
-        { x: 1260, y: 397, collected: false },
-        { x: 1720, y: 426, collected: false },
-        { x: 2380, y: 437, collected: false },
+        { x: 200, y: 299, collected: false },
+        { x: 700, y: 345, collected: false },
+        { x: 1260, y: 394, collected: false },
+        { x: 1720, y: 422, collected: false },
+        { x: 2380, y: 447, collected: false },
       ],
     },
   ];

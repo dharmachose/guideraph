@@ -4,11 +4,10 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/cn";
 
 const TABS = [
-  { href: "/pronostics", label: "Pronostics", icon: "🔮", short: "Pronos" },
-  { href: "/bingo", label: "Bingo Rando", icon: "🎯", short: "Bingo" },
-  { href: "/defis", label: "Défis", icon: "🃏", short: "Défis" },
-  { href: "/quiz", label: "Quiz", icon: "🏔️", short: "Quiz" },
-  { href: "/ski", label: "Ski", icon: "🎿", short: "Ski" },
+  { href: "/ski/dva", label: "DVA Search", icon: "📡", short: "DVA" },
+  { href: "/ski/avalanche", label: "Avalanche", icon: "🏔️", short: "Aval." },
+  { href: "/ski/guide", label: "Suit Raph", icon: "🗺️", short: "Raph" },
+  { href: "/ski/crevasse", label: "Crevo-Hop", icon: "⚡", short: "Crevo" },
 ];
 
 export function BottomNav() {

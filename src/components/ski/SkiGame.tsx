@@ -502,7 +502,8 @@ export function SkiGame({ onBack }: SkiGameProps) {
   const [score, setScore]            = useState(0);
   const [totalStars, setTotalStars]  = useState(0);
   const [lineCount, setLineCount]    = useState(0);
-  const [canvasSize, setCanvasSize]  = useState({ w: 360, h: 420 });
+  const [canvasSize, setCanvasSize]  = useState({ w: 360, h: 500 });
+  const [displaySize, setDisplaySize] = useState({ w: 360, h: 500 });
 
   // ── Init level ──────────────────────────────
   const initLevel = useCallback((idx: number) => {
@@ -538,9 +539,15 @@ export function SkiGame({ onBack }: SkiGameProps) {
   useEffect(() => {
     function measure() {
       const w = Math.min(window.innerWidth, 600);
-      // Terrain y-values go up to ~460px — need at least 500px height to be visible
-      const h = Math.max(500, Math.round(w * 0.84));
-      setCanvasSize({ w, h });
+      // Game coordinate space: terrain y-values go up to ~460px, need 500px height
+      const COORD_H = 500;
+      setCanvasSize({ w, h: COORD_H });
+
+      // Scale canvas to fit available viewport (PageHeader≈56 + level bar≈44 + hint≈36 +
+      // controls≈54 + BottomNav padding≈72 = ~262px of UI chrome)
+      const availH = Math.max(240, window.innerHeight - 262);
+      const scale = Math.min(1, availH / COORD_H);
+      setDisplaySize({ w: Math.round(w * scale), h: Math.round(COORD_H * scale) });
     }
     measure();
     window.addEventListener("resize", measure);
@@ -916,7 +923,7 @@ export function SkiGame({ onBack }: SkiGameProps) {
         width={canvasSize.w}
         height={canvasSize.h}
         className="block touch-none"
-        style={{ width: canvasSize.w, height: canvasSize.h, maxWidth: "100%" }}
+        style={{ width: displaySize.w, height: displaySize.h, maxWidth: "100%" }}
         onMouseDown={startDraw}
         onMouseMove={moveDraw}
         onMouseUp={endDraw}

@@ -27,12 +27,12 @@ interface LevelDef {
 // ─────────────────────────────────────────────
 // PHYSICS CONSTANTS
 // ─────────────────────────────────────────────
-const GRAVITY   = 0.32;
-const FRICTION  = 0.997;
+const GRAVITY   = 0.40;
+const FRICTION  = 0.993;
 const RADIUS    = 11;
 const DEATH_Y   = 560;
 const WIN_DIST  = 30;
-const MAX_VX    = 14;
+const MAX_VX    = 16;
 const STAR_R    = 14;
 
 // ─────────────────────────────────────────────
@@ -153,10 +153,11 @@ function resolveCollisions(
   px: number, py: number,
   vx: number, vy: number,
   allSegs: Seg[]
-): { px: number; py: number; vx: number; vy: number; onGround: boolean } {
+): { px: number; py: number; vx: number; vy: number; onGround: boolean; groundSeg: Seg | null } {
   let onGround = false;
+  let groundSeg: Seg | null = null;
 
-  for (let iter = 0; iter < 3; iter++) {
+  for (let iter = 0; iter < 4; iter++) {
     for (const s of allSegs) {
       const cp = closestOnSeg(px, py, s);
       const nx = px - cp.x;
@@ -168,11 +169,11 @@ function resolveCollisions(
         const nnx = nx / dist;
         const nny = ny / dist;
 
-        // Only resolve if moving into surface
+        // Remove full normal-velocity component (perfectly inelastic — no bouncing)
         const dot = vx * nnx + vy * nny;
         if (dot < 0) {
-          vx -= dot * nnx * 0.2; // small bounce dampening
-          vy -= dot * nny * 0.2;
+          vx -= dot * nnx;
+          vy -= dot * nny;
         }
 
         // Push out
@@ -180,12 +181,12 @@ function resolveCollisions(
         py = cp.y + nny * (RADIUS + 0.5);
 
         // If normal points upward (nny < -0.3) → standing on ground
-        if (nny < -0.3) onGround = true;
+        if (nny < -0.3) { onGround = true; groundSeg = s; }
       }
     }
   }
 
-  return { px, py, vx, vy, onGround };
+  return { px, py, vx, vy, onGround, groundSeg };
 }
 
 // ─────────────────────────────────────────────
@@ -520,7 +521,8 @@ export function SkiGame({ onBack }: SkiGameProps) {
     s.camX       = Math.max(0, level.startX - canvasSize.w * 0.3);
     s.drawnLines = [];
     s.currentLine = null;
-    s.phase       = "drawing";
+    s.phase       = "running";  // Snow Line: start rolling immediately
+    s.vx          = 2;          // gentle initial push
     s.stars       = level.stars.map(st => ({ ...st, collected: false }));
     s.score       = 0;
     s.t           = 0;
@@ -528,7 +530,7 @@ export function SkiGame({ onBack }: SkiGameProps) {
     s.winCountdown   = 0;
     s.isDrawing      = false;
 
-    setUiPhase("drawing");
+    setUiPhase("running");
     setLevelIdx(idx);
     setScore(0);
     setTotalStars(level.stars.length);
@@ -589,7 +591,7 @@ export function SkiGame({ onBack }: SkiGameProps) {
   function startDraw(e: React.TouchEvent | React.MouseEvent) {
     e.preventDefault();
     const s = stateRef.current;
-    if (s.phase !== "drawing") return;
+    if (s.phase !== "running") return;  // draw only while rolling
     const pt = getCanvasPos(e as unknown as TouchEvent | MouseEvent);
     s.currentLine = [pt];
     s.isDrawing = true;
@@ -598,7 +600,7 @@ export function SkiGame({ onBack }: SkiGameProps) {
   function moveDraw(e: React.TouchEvent | React.MouseEvent) {
     e.preventDefault();
     const s = stateRef.current;
-    if (!s.isDrawing || s.phase !== "drawing" || !s.currentLine) return;
+    if (!s.isDrawing || s.phase !== "running" || !s.currentLine) return;
     const pt = getCanvasPos(e as unknown as TouchEvent | MouseEvent);
     const last = s.currentLine[s.currentLine.length - 1];
     if (Math.hypot(pt.x - last.x, pt.y - last.y) > 5) {
@@ -616,15 +618,6 @@ export function SkiGame({ onBack }: SkiGameProps) {
       setLineCount(s.drawnLines.length);
     }
     s.currentLine = null;
-  }
-
-  // ── Launch Raph ──────────────────────────────
-  function launchRaph() {
-    const s = stateRef.current;
-    s.phase = "running";
-    s.vy = 0;
-    s.vx = 2; // initial push
-    setUiPhase("running");
   }
 
   // ── Undo last line ───────────────────────────
@@ -693,6 +686,18 @@ export function SkiGame({ onBack }: SkiGameProps) {
         const res = resolveCollisions(s.px, s.py, s.vx, s.vy, allSegs);
         s.px = res.px; s.py = res.py;
         s.vx = res.vx; s.vy = res.vy;
+
+        // Snow Line feel: align velocity to surface tangent when on ground
+        if (res.onGround && res.groundSeg) {
+          const seg = res.groundSeg;
+          const sdx = seg.x2 - seg.x1, sdy = seg.y2 - seg.y1;
+          const slen = Math.hypot(sdx, sdy);
+          if (slen > 0.001) {
+            const tx = sdx / slen, ty = sdy / slen;
+            const spd = s.vx * tx + s.vy * ty;
+            if (spd > 0) { s.vx = tx * spd; s.vy = ty * spd; }
+          }
+        }
 
         // Camera follow
         const targetCamX = Math.max(0, Math.min(
@@ -789,8 +794,8 @@ export function SkiGame({ onBack }: SkiGameProps) {
       // Player skier
       drawSkier(ctx, s.px - s.camX, s.py, s.vx, s.phase === "running", s.t, helmetColor, bodyColor, playerEmoji);
 
-      // Crevasse danger indicators (small arrows pointing up from gaps)
-      if (s.phase === "drawing" && s.level) {
+      // Crevasse danger indicators (shown always while running)
+      if (s.phase === "running" && s.level) {
         const segs = s.level.terrain;
         ctx.save();
         ctx.fillStyle = "#E8804A";
@@ -806,6 +811,24 @@ export function SkiGame({ onBack }: SkiGameProps) {
           }
         }
         ctx.globalAlpha = 1;
+        ctx.restore();
+      }
+
+      // Hint overlay during first 300 frames (~5 s)
+      if (s.t < 300 && s.t > 30 && s.level) {
+        const alpha = Math.min(1, (s.t - 30) / 30) * Math.min(1, (300 - s.t) / 60);
+        ctx.save();
+        ctx.globalAlpha = alpha * 0.85;
+        ctx.fillStyle = "#0F1923";
+        ctx.beginPath();
+        ctx.roundRect(W / 2 - 155, H - 70, 310, 36, 8);
+        ctx.fill();
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = "#5EADD4";
+        ctx.font = "bold 11px system-ui";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(`✏️ Dessine un pont sur les crevasses ⚠️`, W / 2, H - 52);
         ctx.restore();
       }
 
@@ -899,23 +922,14 @@ export function SkiGame({ onBack }: SkiGameProps) {
           </button>
           <div className="text-right">
             <p className="text-snow text-xs font-semibold">⭐ {score}/{totalStars}</p>
-            {uiPhase === "drawing" && (
+            {uiPhase === "running" && lineCount > 0 && (
               <p className="text-mist text-[10px]">
-                {lineCount} ligne{lineCount > 1 ? "s" : ""}
+                {lineCount} pont{lineCount > 1 ? "s" : ""}
               </p>
             )}
           </div>
         </div>
       </div>
-
-      {/* Hint */}
-      {uiPhase === "drawing" && levelDef?.hint && (
-        <div className="w-full bg-glacier/10 border-b border-glacier/20 px-4 py-1.5">
-          <p className="text-glacier text-xs text-center font-accent italic">
-            💡 {levelDef.hint} — rejoins Raph 🗺️
-          </p>
-        </div>
-      )}
 
       {/* Canvas */}
       <canvas
@@ -934,31 +948,22 @@ export function SkiGame({ onBack }: SkiGameProps) {
 
       {/* Controls */}
       <div className="w-full px-4 py-3 flex gap-2 bg-alpine-dark border-t border-alpine-mid">
-        {uiPhase === "drawing" && (
+        {uiPhase === "running" && (
           <>
             <button
               onClick={undoLine}
               disabled={lineCount === 0}
               className="flex-none px-3 py-2.5 rounded-xl bg-alpine-mid text-mist text-sm font-semibold disabled:opacity-30 active:scale-95"
             >
-              ↩ Effacer
+              ↩ Pont
             </button>
             <button
-              onClick={launchRaph}
-              className="flex-1 py-2.5 rounded-xl bg-glacier text-alpine-dark font-heading text-xl tracking-wide active:scale-95"
+              onClick={resetLevel}
+              className="flex-1 py-2.5 rounded-xl bg-alpine-mid text-mist font-semibold text-sm active:scale-95"
             >
-              🎿 C'est parti {playerName} !
+              🔄 Recommencer
             </button>
           </>
-        )}
-
-        {uiPhase === "running" && (
-          <button
-            onClick={resetLevel}
-            className="flex-1 py-2.5 rounded-xl bg-alpine-mid text-mist font-semibold text-sm active:scale-95"
-          >
-            ↩ Redessiner
-          </button>
         )}
 
         {uiPhase === "dead" && (

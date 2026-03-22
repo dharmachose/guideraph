@@ -41,87 +41,61 @@ const STAR_R    = 14;
 function buildLevels(): LevelDef[] {
   return [
     {
+      // Level 1 — one gap, almost entirely visible at start (worldWidth 440)
       name: "Combe Douce",
-      hint: "Dessine un pont au-dessus de la crevasse",
-      worldWidth: 2200,
+      hint: "Dessine un pont pour franchir la crevasse",
+      worldWidth: 440,
       terrain: [
-        { x1: -200, y1: 345, x2: 480,  y2: 400 },
-        // gap 480-640  (next seg LOWER: 410 > 400 ✓)
-        { x1: 640,  y1: 410, x2: 1100, y2: 450 },
-        // gap 1100-1280 (460 > 450 ✓)
-        { x1: 1280, y1: 460, x2: 1880, y2: 475 },
-        // gap 1880-2040 (478 > 475 ✓)
-        { x1: 2040, y1: 478, x2: 2500, y2: 478 },
+        { x1: -20, y1: 245, x2: 130, y2: 278 },
+        // gap 130-200 (70 px) — 290>278 ✓
+        { x1: 200, y1: 290, x2: 460, y2: 306 },
       ],
-      startX: 90, startY: 322,
-      endX: 2150, endY: 478,
-      trees: [
-        { x: 220, y: 379 }, { x: 780, y: 422 }, { x: 1550, y: 467 },
-        { x: 2120, y: 478 },
-      ],
-      stars: [
-        { x: 290, y: 363, collected: false },
-        { x: 860, y: 407, collected: false },
-        { x: 1570, y: 445, collected: false },
-      ],
+      startX: 55,  startY: 250,
+      endX:   375, endY:   302,
+      trees: [{ x: 320, y: 303 }],
+      stars: [{ x: 278, y: 270, collected: false }],
     },
     {
+      // Level 2 — two gaps, worldWidth 580
       name: "Couloir du Guide",
-      hint: "Plusieurs crevasses — dessine les ponts vite !",
-      worldWidth: 2800,
+      hint: "Deux crevasses — trace les ponts !",
+      worldWidth: 580,
       terrain: [
-        { x1: -200, y1: 310, x2: 400,  y2: 370 },
-        // gap 400-590  (380 > 370 ✓)
-        { x1: 590,  y1: 380, x2: 960,  y2: 420 },
-        // gap 960-1170 (430 > 420 ✓)
-        { x1: 1170, y1: 430, x2: 1550, y2: 455 },
-        // gap 1550-1760 (462 > 455 ✓)
-        { x1: 1760, y1: 462, x2: 2180, y2: 475 },
-        // gap 2180-2370 (478 > 475 ✓)
-        { x1: 2370, y1: 478, x2: 3000, y2: 478 },
+        { x1: -20, y1: 225, x2: 110, y2: 258 },
+        // gap 110-180 (70 px) — 270>258 ✓
+        { x1: 180, y1: 270, x2: 290, y2: 284 },
+        // gap 290-360 (70 px) — 295>284 ✓
+        { x1: 360, y1: 295, x2: 600, y2: 308 },
       ],
-      startX: 90, startY: 285,
-      endX: 2700, endY: 478,
-      trees: [
-        { x: 180, y: 348 }, { x: 680, y: 390 }, { x: 1300, y: 439 },
-        { x: 1860, y: 465 }, { x: 2500, y: 478 },
-      ],
+      startX: 48,  startY: 228,
+      endX:   500, endY:   301,
+      trees: [{ x: 242, y: 281 }, { x: 462, y: 305 }],
       stars: [
-        { x: 240, y: 332, collected: false },
-        { x: 740, y: 374, collected: false },
-        { x: 1350, y: 420, collected: false },
-        { x: 1860, y: 443, collected: false },
+        { x: 238, y: 264, collected: false },
+        { x: 420, y: 289, collected: false },
       ],
     },
     {
+      // Level 3 — three gaps, worldWidth 720
       name: "Face Nord de la Grande Casse",
-      hint: "La ligne de Raph. Ne le laisse pas tomber !",
-      worldWidth: 3400,
+      hint: "Trois crevasses — la ligne de Raph !",
+      worldWidth: 720,
       terrain: [
-        { x1: -200, y1: 270, x2: 350,  y2: 340 },
-        // gap 350-580  (350 > 340 ✓)
-        { x1: 580,  y1: 350, x2: 860,  y2: 390 },
-        // gap 860-1080 (400 > 390 ✓)
-        { x1: 1080, y1: 400, x2: 1420, y2: 430 },
-        // gap 1420-1640 (440 > 430 ✓)
-        { x1: 1640, y1: 440, x2: 2000, y2: 460 },
-        // gap 2000-2230 (465 > 460 ✓)
-        { x1: 2230, y1: 465, x2: 2620, y2: 475 },
-        // gap 2620-2840 (478 > 475 ✓)
-        { x1: 2840, y1: 478, x2: 3600, y2: 478 },
+        { x1: -20, y1: 210, x2: 100, y2: 243 },
+        // gap 100-170 (70 px) — 255>243 ✓
+        { x1: 170, y1: 255, x2: 265, y2: 270 },
+        // gap 265-335 (70 px) — 282>270 ✓
+        { x1: 335, y1: 282, x2: 430, y2: 294 },
+        // gap 430-500 (70 px) — 305>294 ✓
+        { x1: 500, y1: 305, x2: 740, y2: 316 },
       ],
-      startX: 90, startY: 245,
-      endX: 3280, endY: 478,
-      trees: [
-        { x: 200, y: 321 }, { x: 660, y: 361 }, { x: 1230, y: 413 },
-        { x: 1740, y: 446 }, { x: 2380, y: 469 }, { x: 3000, y: 478 },
-      ],
+      startX: 44,  startY: 213,
+      endX:   640, endY:   311,
+      trees: [{ x: 218, y: 267 }, { x: 382, y: 291 }, { x: 576, y: 313 }],
       stars: [
-        { x: 200, y: 299, collected: false },
-        { x: 700, y: 345, collected: false },
-        { x: 1260, y: 394, collected: false },
-        { x: 1720, y: 422, collected: false },
-        { x: 2380, y: 447, collected: false },
+        { x: 214, y: 249, collected: false },
+        { x: 378, y: 275, collected: false },
+        { x: 560, y: 297, collected: false },
       ],
     },
   ];
@@ -518,11 +492,10 @@ export function SkiGame({ onBack }: SkiGameProps) {
     s.py         = level.startY;
     s.vx         = 0;
     s.vy         = 0;
-    s.camX       = Math.max(0, level.startX - canvasSize.w * 0.3);
+    s.camX       = 0;            // show level from the left — compact levels fit the canvas
     s.drawnLines = [];
     s.currentLine = null;
-    s.phase       = "running";  // Snow Line: start rolling immediately
-    s.vx          = 2;          // gentle initial push
+    s.phase       = "drawing";  // draw bridges first, then launch
     s.stars       = level.stars.map(st => ({ ...st, collected: false }));
     s.score       = 0;
     s.t           = 0;
@@ -530,7 +503,7 @@ export function SkiGame({ onBack }: SkiGameProps) {
     s.winCountdown   = 0;
     s.isDrawing      = false;
 
-    setUiPhase("running");
+    setUiPhase("drawing");
     setLevelIdx(idx);
     setScore(0);
     setTotalStars(level.stars.length);
@@ -545,9 +518,9 @@ export function SkiGame({ onBack }: SkiGameProps) {
       const COORD_H = 500;
       setCanvasSize({ w, h: COORD_H });
 
-      // Scale canvas to fit available viewport (PageHeader≈56 + level bar≈44 + hint≈36 +
-      // controls≈54 + BottomNav padding≈72 = ~262px of UI chrome)
-      const availH = Math.max(240, window.innerHeight - 262);
+      // Scale canvas to fit available viewport (PageHeader≈56 + level bar≈44 +
+      // controls≈54 + BottomNav padding≈72 = ~226px of UI chrome)
+      const availH = Math.max(240, window.innerHeight - 226);
       const scale = Math.min(1, availH / COORD_H);
       setDisplaySize({ w: Math.round(w * scale), h: Math.round(COORD_H * scale) });
     }
@@ -591,7 +564,7 @@ export function SkiGame({ onBack }: SkiGameProps) {
   function startDraw(e: React.TouchEvent | React.MouseEvent) {
     e.preventDefault();
     const s = stateRef.current;
-    if (s.phase !== "running") return;  // draw only while rolling
+    if (s.phase !== "drawing" && s.phase !== "running") return;
     const pt = getCanvasPos(e as unknown as TouchEvent | MouseEvent);
     s.currentLine = [pt];
     s.isDrawing = true;
@@ -600,7 +573,7 @@ export function SkiGame({ onBack }: SkiGameProps) {
   function moveDraw(e: React.TouchEvent | React.MouseEvent) {
     e.preventDefault();
     const s = stateRef.current;
-    if (!s.isDrawing || s.phase !== "running" || !s.currentLine) return;
+    if (!s.isDrawing || (s.phase !== "drawing" && s.phase !== "running") || !s.currentLine) return;
     const pt = getCanvasPos(e as unknown as TouchEvent | MouseEvent);
     const last = s.currentLine[s.currentLine.length - 1];
     if (Math.hypot(pt.x - last.x, pt.y - last.y) > 5) {
@@ -618,6 +591,15 @@ export function SkiGame({ onBack }: SkiGameProps) {
       setLineCount(s.drawnLines.length);
     }
     s.currentLine = null;
+  }
+
+  // ── Launch ───────────────────────────────────
+  function launchRaph() {
+    const s = stateRef.current;
+    if (s.phase !== "drawing") return;
+    s.phase = "running";
+    s.vx    = 2;
+    setUiPhase("running");
   }
 
   // ── Undo last line ───────────────────────────
@@ -758,7 +740,7 @@ export function SkiGame({ onBack }: SkiGameProps) {
       // Player drawn lines
       ctx.save();
       ctx.strokeStyle = "#FF8B94";
-      ctx.lineWidth = 4;
+      ctx.lineWidth = 6;
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
       ctx.shadowColor = "rgba(255,139,148,0.5)";
@@ -794,8 +776,8 @@ export function SkiGame({ onBack }: SkiGameProps) {
       // Player skier
       drawSkier(ctx, s.px - s.camX, s.py, s.vx, s.phase === "running", s.t, helmetColor, bodyColor, playerEmoji);
 
-      // Crevasse danger indicators (shown always while running)
-      if (s.phase === "running" && s.level) {
+      // Crevasse danger indicators (drawing + running)
+      if ((s.phase === "drawing" || s.phase === "running") && s.level) {
         const segs = s.level.terrain;
         ctx.save();
         ctx.fillStyle = "#E8804A";
@@ -922,7 +904,7 @@ export function SkiGame({ onBack }: SkiGameProps) {
           </button>
           <div className="text-right">
             <p className="text-snow text-xs font-semibold">⭐ {score}/{totalStars}</p>
-            {uiPhase === "running" && lineCount > 0 && (
+            {uiPhase === "drawing" && lineCount > 0 && (
               <p className="text-mist text-[10px]">
                 {lineCount} pont{lineCount > 1 ? "s" : ""}
               </p>
@@ -948,22 +930,31 @@ export function SkiGame({ onBack }: SkiGameProps) {
 
       {/* Controls */}
       <div className="w-full px-4 py-3 flex gap-2 bg-alpine-dark border-t border-alpine-mid">
-        {uiPhase === "running" && (
+        {uiPhase === "drawing" && (
           <>
             <button
               onClick={undoLine}
               disabled={lineCount === 0}
               className="flex-none px-3 py-2.5 rounded-xl bg-alpine-mid text-mist text-sm font-semibold disabled:opacity-30 active:scale-95"
             >
-              ↩ Pont
+              ↩ Effacer
             </button>
             <button
-              onClick={resetLevel}
-              className="flex-1 py-2.5 rounded-xl bg-alpine-mid text-mist font-semibold text-sm active:scale-95"
+              onClick={launchRaph}
+              className="flex-1 py-2.5 rounded-xl bg-glacier text-alpine-dark font-heading text-xl tracking-wide active:scale-95"
             >
-              🔄 Recommencer
+              🎿 C&apos;est parti !
             </button>
           </>
+        )}
+
+        {uiPhase === "running" && (
+          <button
+            onClick={resetLevel}
+            className="flex-1 py-2.5 rounded-xl bg-alpine-mid text-mist font-semibold text-sm active:scale-95"
+          >
+            ↩ Redessiner
+          </button>
         )}
 
         {uiPhase === "dead" && (

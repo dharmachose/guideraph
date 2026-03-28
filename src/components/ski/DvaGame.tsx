@@ -1,6 +1,8 @@
 "use client";
 import { useRef, useEffect, useState, useCallback } from "react";
 import { PLAYERS } from "@/data/players";
+import { usePlayer } from "@/lib/player-context";
+import { submitDvaScore, fetchDvaLeaderboard, type DvaScore } from "@/lib/leaderboard";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const W = 375;
@@ -105,6 +107,8 @@ export function DvaGame() {
     elapsed: number;
     score: number;
   }>({ phase: "ready", found: 0, elapsed: 0, score: 0 });
+  const [leaderboard, setLeaderboard] = useState<DvaScore[]>([]);
+  const { player } = usePlayer();
 
   useEffect(() => {
     const calc = () => {
@@ -116,6 +120,26 @@ export function DvaGame() {
     window.addEventListener("resize", calc);
     return () => window.removeEventListener("resize", calc);
   }, []);
+
+  // ─── Leaderboard submit + fetch on win ───────────────────────────────────
+  useEffect(() => {
+    if (displayState.phase !== "win") return;
+    const run = async () => {
+      if (player) {
+        await submitDvaScore({
+          player_id: player.id,
+          player_name: player.name,
+          player_emoji: player.emoji,
+          score: displayState.score,
+          found_count: displayState.found,
+          elapsed_seconds: displayState.elapsed,
+        });
+      }
+      const rows = await fetchDvaLeaderboard();
+      setLeaderboard(rows);
+    };
+    run();
+  }, [displayState.phase]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ─── Draw ─────────────────────────────────────────────────────────────────
   const draw = useCallback(() => {
@@ -426,6 +450,26 @@ export function DvaGame() {
       <p className="text-mist text-xs mt-2 text-center px-4">
         Glisse le doigt · signal = barres vertes · approche pour capturer
       </p>
+
+      {displayState.phase === "win" && leaderboard.length > 0 && (
+        <div className="w-full max-w-sm mt-4 px-4">
+          <h3 className="font-heading text-glacier text-lg mb-2 text-center">🏆 Classement</h3>
+          <div className="space-y-1">
+            {leaderboard.map((row, i) => (
+              <div
+                key={row.id ?? i}
+                className="flex items-center gap-2 bg-alpine-mid rounded-xl px-3 py-2"
+              >
+                <span className="text-mist text-xs w-4 text-right">{i + 1}</span>
+                <span className="text-base">{row.player_emoji}</span>
+                <span className="flex-1 text-snow text-sm font-semibold">{row.player_name}</span>
+                <span className="text-glacier text-xs">{row.elapsed_seconds}s</span>
+                <span className="text-[#4CAF82] text-xs font-bold">{row.score} pts</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

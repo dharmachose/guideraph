@@ -2,38 +2,41 @@
 import { useRef, useEffect, useState, useCallback } from "react";
 import { usePlayer } from "@/lib/player-context";
 
-// ─── Constants ───────────────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
 const W = 375;
-const H = 500;
-const SHOW_DURATION = 2500;   // ms to show Raph's path
-const FADE_DURATION = 800;    // ms to fade it out
-const ROUNDS = 3;
+const H = 520;
+const ROUNDS = 5;
+const FADE_MS = 550;
+const DRAW_LIMIT_MS = 9000;
 
-// ─── Raph's paths: array of control points for bezier curves ─────────────────
-// Each path is an array of [x,y] points; we draw as a polyline through them
-const RAPH_PATHS: [number, number][][] = [
-  // Round 1: gentle S-curve (easy)
-  [
-    [60, 80], [100, 150], [160, 200], [220, 160],
-    [280, 220], [320, 300], [300, 380],
-  ],
-  // Round 2: zigzag (medium)
-  [
-    [50, 60], [130, 100], [80, 180], [200, 220],
-    [120, 310], [260, 350], [310, 440],
-  ],
-  // Round 3: tight spiral start + long curve (hard)
-  [
-    [80, 50], [60, 120], [140, 160], [100, 240],
-    [200, 260], [160, 350], [280, 370],
-    [320, 430],
-  ],
-];
+const ROUND_CONFIG = [
+  { pts: 4, showMs: 2200 },
+  { pts: 5, showMs: 1900 },
+  { pts: 6, showMs: 1600 },
+  { pts: 7, showMs: 1350 },
+  { pts: 8, showMs: 1100 },
+] as const;
 
-// Sample N equidistant points along a polyline
+// ─── Path generation ──────────────────────────────────────────────────────────
+function generatePath(numPts: number): [number, number][] {
+  const pts: [number, number][] = [];
+  pts.push([60 + Math.random() * (W - 120), 50]);
+  for (let i = 1; i < numPts - 1; i++) {
+    const progress = i / (numPts - 1);
+    const y = 50 + (H - 120) * progress + (Math.random() - 0.5) * 18;
+    const lastX = pts[pts.length - 1][0];
+    const dir = (i % 2 === 0 ? 1 : -1) * (Math.random() > 0.25 ? 1 : -1);
+    const dx = dir * (40 + Math.random() * 95);
+    const x = Math.max(48, Math.min(W - 48, lastX + dx));
+    pts.push([x, Math.min(H - 80, y)]);
+  }
+  pts.push([60 + Math.random() * (W - 120), H - 60]);
+  return pts;
+}
+
+// ─── Scoring helpers ──────────────────────────────────────────────────────────
 function samplePath(pts: [number, number][], n: number): [number, number][] {
   if (pts.length < 2) return pts;
-  // Compute cumulative lengths
   const lens: number[] = [0];
   for (let i = 1; i < pts.length; i++) {
     const dx = pts[i][0] - pts[i - 1][0];
@@ -47,15 +50,19 @@ function samplePath(pts: [number, number][], n: number): [number, number][] {
     let i = 1;
     while (i < lens.length - 1 && lens[i] < t) i++;
     const segT = (t - lens[i - 1]) / (lens[i] - lens[i - 1]);
-    const x = pts[i - 1][0] + segT * (pts[i][0] - pts[i - 1][0]);
-    const y = pts[i - 1][1] + segT * (pts[i][1] - pts[i - 1][1]);
-    result.push([x, y]);
+    result.push([
+      pts[i - 1][0] + segT * (pts[i][0] - pts[i - 1][0]),
+      pts[i - 1][1] + segT * (pts[i][1] - pts[i - 1][1]),
+    ]);
   }
   return result;
 }
 
-// Min distance from a point to a polyline
-function minDistToPolyline(px: number, py: number, pts: [number, number][]): number {
+function minDistToPolyline(
+  px: number,
+  py: number,
+  pts: [number, number][]
+): number {
   let minD = Infinity;
   for (const [x, y] of pts) {
     const d = Math.hypot(px - x, py - y);
@@ -64,14 +71,29 @@ function minDistToPolyline(px: number, py: number, pts: [number, number][]): num
   return minD;
 }
 
+function scoreRound(
+  raphPath: [number, number][],
+  playerPts: [number, number][]
+): number {
+  if (playerPts.length < 5) return 0;
+  const sampled = samplePath(raphPath, 28);
+  let total = 0;
+  for (const [rx, ry] of sampled) {
+    total += minDistToPolyline(rx, ry, playerPts);
+  }
+  const avg = total / sampled.length;
+  return Math.max(0, Math.round(100 - avg * 1.45));
+}
+
+// ─── State ────────────────────────────────────────────────────────────────────
 type Phase = "ready" | "show" | "fade" | "draw" | "score" | "done";
 
 interface GameState {
   phase: Phase;
   round: number;
   phaseStart: number;
-  showProgress: number; // 0-1, how much of Raph's path is drawn
-  fadeAlpha: number;    // 1 → 0 during fade
+  showProgress: number;
+  fadeAlpha: number;
   playerPoints: [number, number][];
   roundScores: number[];
   currentScore: number;
@@ -90,75 +112,83 @@ function makeInitState(): GameState {
   };
 }
 
+// ─── Component ────────────────────────────────────────────────────────────────
 export function GuideGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stateRef = useRef<GameState>(makeInitState());
   const rafRef = useRef<number>(0);
+  const pathsRef = useRef<[number, number][][]>([]);
   const [scale, setScale] = useState(1);
-  const [displayPhase, setDisplayPhase] = useState<Phase>("ready");
-  const [displayRound, setDisplayRound] = useState(0);
-  const [displayScore, setDisplayScore] = useState(0);
+  const [phase, setPhase] = useState<Phase>("ready");
+  const [doneData, setDoneData] = useState<{
+    scores: number[];
+    avg: number;
+  } | null>(null);
   const { player } = usePlayer();
+  const playerColor = player?.color ?? "#5EADD4";
 
   useEffect(() => {
     const calc = () => {
-      const availH = window.innerHeight - 56 - 72;
-      const s = Math.min(1, availH / H, window.innerWidth / W);
-      setScale(s);
+      const availH = window.innerHeight - 56 - 60;
+      setScale(Math.min(1, availH / H, window.innerWidth / W));
     };
     calc();
     window.addEventListener("resize", calc);
     return () => window.removeEventListener("resize", calc);
   }, []);
 
-  const playerColor = player?.color ?? "#5EADD4";
-
-  // ─── Draw ─────────────────────────────────────────────────────────────────
+  // ─── Draw ──────────────────────────────────────────────────────────────────
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     const s = stateRef.current;
+    const now = Date.now();
 
-    // Snow background
-    ctx.fillStyle = "#EAF4F8";
+    // Background
+    const bg = ctx.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, "#C5E0F0");
+    bg.addColorStop(1, "#E8F4FA");
+    ctx.fillStyle = bg;
     ctx.fillRect(0, 0, W, H);
 
-    // Subtle grid / snow texture
-    ctx.strokeStyle = "rgba(150,200,220,0.25)";
+    // Subtle grid
+    ctx.strokeStyle = "rgba(140,190,215,0.2)";
     ctx.lineWidth = 1;
-    for (let x = 0; x < W; x += 30) {
+    for (let x = 0; x < W; x += 32) {
       ctx.beginPath();
       ctx.moveTo(x, 0);
       ctx.lineTo(x, H);
       ctx.stroke();
     }
-    for (let y = 0; y < H; y += 30) {
+    for (let y = 0; y < H; y += 32) {
       ctx.beginPath();
       ctx.moveTo(0, y);
       ctx.lineTo(W, y);
       ctx.stroke();
     }
 
-    const raphPath = RAPH_PATHS[s.round] ?? RAPH_PATHS[0];
+    const raphPath = pathsRef.current[s.round];
+    if (!raphPath) return;
 
-    // Raph's path
+    // ── SHOW phase ──────────────────────────────────────────────────────────
     if (s.phase === "show" || s.phase === "fade") {
       const alpha = s.phase === "fade" ? s.fadeAlpha : 1;
       if (alpha > 0) {
-        const totalPts = raphPath.length;
-        const drawCount = s.phase === "show"
-          ? Math.max(1, Math.round(s.showProgress * totalPts))
-          : totalPts;
-
-        ctx.save();
         ctx.globalAlpha = alpha;
+        const totalPts = raphPath.length;
+        const drawCount =
+          s.phase === "show"
+            ? Math.max(1, Math.round(s.showProgress * (totalPts - 1)) + 1)
+            : totalPts;
+
+        // Path line
         ctx.strokeStyle = "#85C1E9";
         ctx.lineWidth = 5;
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
-        ctx.setLineDash([12, 6]);
+        ctx.setLineDash([14, 7]);
         ctx.beginPath();
         ctx.moveTo(raphPath[0][0], raphPath[0][1]);
         for (let i = 1; i < drawCount; i++) {
@@ -167,39 +197,95 @@ export function GuideGame() {
         ctx.stroke();
         ctx.setLineDash([]);
 
-        // Raph emoji at head of path
+        // Waypoint dots — appear as path reaches them
+        for (let i = 0; i < drawCount; i++) {
+          const [px, py] = raphPath[i];
+          const isStart = i === 0;
+          const isEnd = i === raphPath.length - 1;
+          const r = isStart || isEnd ? 11 : 8;
+          const fill = isStart
+            ? "#4CAF82"
+            : isEnd
+            ? "#E8804A"
+            : "#FFE66D";
+
+          ctx.beginPath();
+          ctx.arc(px, py, r, 0, Math.PI * 2);
+          ctx.fillStyle = fill;
+          ctx.fill();
+          ctx.strokeStyle = "rgba(255,255,255,0.7)";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
+
+        // Raph emoji at head of drawn path
         if (s.phase === "show") {
           const head = raphPath[drawCount - 1];
           ctx.font = "22px serif";
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
-          ctx.fillText("🗺️", head[0], head[1] - 18);
+          ctx.fillText("🗺️", head[0], head[1] - 22);
         }
-        ctx.restore();
+
+        ctx.globalAlpha = 1;
       }
     }
 
-    // Player's drawn path
-    if (
-      (s.phase === "draw" || s.phase === "score") &&
-      s.playerPoints.length > 1
-    ) {
-      ctx.strokeStyle = playerColor;
-      ctx.lineWidth = 4;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
+    // ── DRAW phase ──────────────────────────────────────────────────────────
+    if (s.phase === "draw") {
+      // Timer bar at top
+      const elapsed = now - s.phaseStart;
+      const remaining = Math.max(0, DRAW_LIMIT_MS - elapsed);
+      const frac = remaining / DRAW_LIMIT_MS;
+      const barColor =
+        frac > 0.5 ? "#4CAF82" : frac > 0.25 ? "#FFE66D" : "#E8804A";
+      ctx.fillStyle = "rgba(10,20,30,0.4)";
+      ctx.fillRect(0, 0, W, 10);
+      ctx.fillStyle = barColor;
+      ctx.fillRect(0, 0, W * frac, 10);
+
+      // Start dot (pulsing green)
+      const pulse = (Math.sin(now / 280) + 1) / 2;
+      const [sx, sy] = raphPath[0];
       ctx.beginPath();
-      ctx.moveTo(s.playerPoints[0][0], s.playerPoints[0][1]);
-      for (let i = 1; i < s.playerPoints.length; i++) {
-        ctx.lineTo(s.playerPoints[i][0], s.playerPoints[i][1]);
-      }
+      ctx.arc(sx, sy, 9 + pulse * 4, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(76,175,130,${0.25 + pulse * 0.2})`;
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(sx, sy, 9, 0, Math.PI * 2);
+      ctx.fillStyle = "#4CAF82";
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.8)";
+      ctx.lineWidth = 2;
       ctx.stroke();
+
+      // Player's drawn path
+      if (s.playerPoints.length > 1) {
+        ctx.strokeStyle = playerColor;
+        ctx.lineWidth = 5;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.beginPath();
+        ctx.moveTo(s.playerPoints[0][0], s.playerPoints[0][1]);
+        for (let i = 1; i < s.playerPoints.length; i++) {
+          ctx.lineTo(s.playerPoints[i][0], s.playerPoints[i][1]);
+        }
+        ctx.stroke();
+
+        // Trail head dot
+        const last = s.playerPoints[s.playerPoints.length - 1];
+        ctx.beginPath();
+        ctx.arc(last[0], last[1], 7, 0, Math.PI * 2);
+        ctx.fillStyle = playerColor;
+        ctx.fill();
+      }
     }
 
-    // Show Raph's path as ghost during score phase
+    // ── SCORE phase ─────────────────────────────────────────────────────────
     if (s.phase === "score") {
+      // Ghost: Raph's path
       ctx.save();
-      ctx.globalAlpha = 0.35;
+      ctx.globalAlpha = 0.5;
       ctx.strokeStyle = "#85C1E9";
       ctx.lineWidth = 5;
       ctx.lineCap = "round";
@@ -207,146 +293,179 @@ export function GuideGame() {
       ctx.setLineDash([12, 6]);
       ctx.beginPath();
       ctx.moveTo(raphPath[0][0], raphPath[0][1]);
-      for (let i = 1; i < raphPath.length; i++) {
-        ctx.lineTo(raphPath[i][0], raphPath[i][1]);
-      }
+      for (const [px, py] of raphPath) ctx.lineTo(px, py);
       ctx.stroke();
       ctx.setLineDash([]);
+
+      // Waypoint dots (ghost)
+      for (let i = 0; i < raphPath.length; i++) {
+        const [px, py] = raphPath[i];
+        ctx.beginPath();
+        ctx.arc(px, py, i === 0 || i === raphPath.length - 1 ? 10 : 7, 0, Math.PI * 2);
+        ctx.fillStyle =
+          i === 0 ? "#4CAF82" : i === raphPath.length - 1 ? "#E8804A" : "#FFE66D";
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
       ctx.restore();
+
+      // Player's path
+      if (s.playerPoints.length > 1) {
+        ctx.strokeStyle = playerColor;
+        ctx.lineWidth = 4;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.globalAlpha = 0.9;
+        ctx.beginPath();
+        ctx.moveTo(s.playerPoints[0][0], s.playerPoints[0][1]);
+        for (const [px, py] of s.playerPoints) ctx.lineTo(px, py);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+
+      // Score overlay panel
+      const pct = s.currentScore;
+      const color =
+        pct >= 75 ? "#4CAF82" : pct >= 45 ? "#FFE66D" : "#E8804A";
+      ctx.fillStyle = "rgba(10,20,30,0.84)";
+      ctx.beginPath();
+      ctx.roundRect(W / 2 - 130, H / 2 - 90, 260, 200, 20);
+      ctx.fill();
+
+      ctx.fillStyle = color;
+      ctx.font = "bold 72px 'Bebas Neue', Impact, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(`${pct}`, W / 2, H / 2 - 28);
+
+      ctx.fillStyle = "#F0F4F8";
+      ctx.font = "bold 18px Inter, sans-serif";
+      ctx.fillText("/ 100", W / 2, H / 2 + 20);
+
+      ctx.font = "13px Inter, sans-serif";
+      ctx.fillStyle = "#94A3B8";
+      const msg =
+        pct >= 80
+          ? "Parfait, tu connais le chemin !"
+          : pct >= 55
+          ? "Bonne mémoire !"
+          : pct >= 30
+          ? "Pas mal, continue !"
+          : "Perdu dans la neige !";
+      ctx.fillText(msg, W / 2, H / 2 + 52);
+
+      ctx.fillStyle = "#5EADD4";
+      ctx.font = "bold 14px Inter, sans-serif";
+      const nextLabel =
+        s.round < ROUNDS - 1
+          ? "TAP → manche suivante"
+          : "TAP → résultat final";
+      ctx.fillText(nextLabel, W / 2, H / 2 + 86);
     }
 
-    // HUD
+    // ── HUD (manche counter) ─────────────────────────────────────────────────
     if (s.phase !== "ready" && s.phase !== "done") {
-      ctx.fillStyle = "rgba(15,25,35,0.7)";
+      ctx.fillStyle = "rgba(10,20,30,0.72)";
       ctx.beginPath();
-      ctx.roundRect(10, 10, 160, 36, 10);
+      ctx.roundRect(
+        s.phase === "draw" ? 8 : 8,
+        s.phase === "draw" ? 16 : 10,
+        150,
+        34,
+        10
+      );
       ctx.fill();
       ctx.fillStyle = "#F0F4F8";
       ctx.font = "bold 15px Inter, sans-serif";
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
-      ctx.fillText(`Manche ${s.round + 1} / ${ROUNDS}`, 20, 28);
+      ctx.fillText(
+        `Manche ${s.round + 1} / ${ROUNDS}`,
+        18,
+        s.phase === "draw" ? 33 : 27
+      );
 
+      // Phase hint
       if (s.phase === "show") {
         ctx.fillStyle = "#85C1E9";
-        ctx.font = "bold 14px Inter, sans-serif";
+        ctx.font = "bold 13px Inter, sans-serif";
         ctx.textAlign = "center";
-        ctx.fillText("Mémorise le chemin de Raph !", W / 2, H - 30);
+        ctx.fillText("Mémorise le chemin !", W / 2, H - 20);
       }
       if (s.phase === "fade") {
         ctx.fillStyle = "#FFE66D";
-        ctx.font = "bold 14px Inter, sans-serif";
+        ctx.font = "bold 13px Inter, sans-serif";
         ctx.textAlign = "center";
-        ctx.fillText("Il disparaît... Prépare-toi !", W / 2, H - 30);
+        ctx.fillText("Il disparaît… Prépare-toi !", W / 2, H - 20);
       }
       if (s.phase === "draw") {
         ctx.fillStyle = "#4CAF82";
-        ctx.font = "bold 15px Inter, sans-serif";
+        ctx.font = "bold 14px Inter, sans-serif";
         ctx.textAlign = "center";
-        ctx.fillText("Trace le chemin de mémoire !", W / 2, H - 30);
+        ctx.fillText("Trace le chemin de mémoire !", W / 2, H - 20);
       }
     }
 
-    // Score overlay
-    if (s.phase === "score") {
-      ctx.fillStyle = "rgba(15,25,35,0.82)";
-      ctx.fillRect(0, 0, W, H);
-      const pct = s.currentScore;
-      const color = pct >= 70 ? "#4CAF82" : pct >= 40 ? "#FFE66D" : "#E8804A";
-      ctx.fillStyle = color;
-      ctx.font = "bold 64px 'Bebas Neue', Impact, sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(`${pct}`, W / 2, H / 2 - 30);
-      ctx.fillStyle = "#F0F4F8";
-      ctx.font = "bold 20px Inter, sans-serif";
-      ctx.fillText("/ 100", W / 2, H / 2 + 20);
-      const msg = pct >= 80 ? "Guide-né !" : pct >= 50 ? "Bonne mémoire !" : "Perdu dans la neige !";
-      ctx.font = "14px Inter, sans-serif";
-      ctx.fillStyle = "#94A3B8";
-      ctx.fillText(msg, W / 2, H / 2 + 60);
-      ctx.fillStyle = "#5EADD4";
-      ctx.font = "bold 16px Inter, sans-serif";
-      const nextLabel = s.round < ROUNDS - 1 ? "TAP pour la manche suivante" : "TAP pour le résultat final";
-      ctx.fillText(nextLabel, W / 2, H / 2 + 110);
-    }
-
-    // Ready overlay
+    // ── READY overlay ────────────────────────────────────────────────────────
     if (s.phase === "ready") {
-      ctx.fillStyle = "rgba(15,25,35,0.78)";
+      ctx.fillStyle = "rgba(10,20,35,0.82)";
       ctx.fillRect(0, 0, W, H);
       ctx.fillStyle = "#F0F4F8";
-      ctx.font = "bold 36px 'Bebas Neue', Impact, sans-serif";
+      ctx.font = "bold 38px 'Bebas Neue', Impact, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText("SUIT RAPH LE GUIDE", W / 2, H / 2 - 70);
-      ctx.font = "28px serif";
-      ctx.fillText("🗺️", W / 2, H / 2 - 20);
+      ctx.fillText("SUIT RAPH LE GUIDE", W / 2, H / 2 - 90);
+      ctx.font = "36px serif";
+      ctx.fillText("🗺️", W / 2, H / 2 - 42);
       ctx.font = "14px Inter, sans-serif";
       ctx.fillStyle = "#94A3B8";
-      ctx.fillText("Regarde le chemin de Raph,", W / 2, H / 2 + 18);
-      ctx.fillText("mémorise-le et reproduis-le !", W / 2, H / 2 + 38);
+      ctx.fillText(`${ROUNDS} manches · chemin aléatoire`, W / 2, H / 2 + 10);
+      ctx.fillText("Mémorise · puis trace en 9 secondes", W / 2, H / 2 + 30);
+      ctx.fillText("🟢 départ  ●  waypoints  🟠 arrivée", W / 2, H / 2 + 54);
       ctx.fillStyle = "#85C1E9";
-      ctx.font = "bold 20px Inter, sans-serif";
-      ctx.fillText("TAP pour commencer", W / 2, H / 2 + 90);
-    }
-
-    // Done overlay
-    if (s.phase === "done") {
-      const total = s.roundScores.reduce((a, b) => a + b, 0);
-      const avg = Math.round(total / s.roundScores.length);
-      ctx.fillStyle = "rgba(15,25,35,0.88)";
-      ctx.fillRect(0, 0, W, H);
-      ctx.fillStyle = "#85C1E9";
-      ctx.font = "bold 40px 'Bebas Neue', Impact, sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText("RÉSULTAT FINAL", W / 2, H / 2 - 100);
-
-      s.roundScores.forEach((sc, i) => {
-        const color = sc >= 70 ? "#4CAF82" : sc >= 40 ? "#FFE66D" : "#E8804A";
-        ctx.fillStyle = color;
-        ctx.font = "bold 22px Inter, sans-serif";
-        ctx.fillText(`Manche ${i + 1} : ${sc} / 100`, W / 2, H / 2 - 40 + i * 40);
-      });
-
-      ctx.fillStyle = "#F0F4F8";
-      ctx.font = "bold 28px Inter, sans-serif";
-      ctx.fillText(`Moyenne : ${avg} / 100`, W / 2, H / 2 + 90);
-
-      const msg = avg >= 70 ? "Tu connais le chemin !" : avg >= 40 ? "Pas mal !" : "Raph attend encore !";
-      ctx.font = "14px Inter, sans-serif";
-      ctx.fillStyle = "#94A3B8";
-      ctx.fillText(msg, W / 2, H / 2 + 130);
-
-      ctx.fillStyle = "#5EADD4";
-      ctx.font = "bold 18px Inter, sans-serif";
-      ctx.fillText("TAP pour rejouer", W / 2, H / 2 + 170);
+      ctx.font = "bold 22px Inter, sans-serif";
+      ctx.fillText("TAP pour commencer", W / 2, H / 2 + 100);
     }
   }, [playerColor]);
 
-  // ─── Animation loop ───────────────────────────────────────────────────────
+  // ─── Animation loop ────────────────────────────────────────────────────────
   const loop = useCallback(() => {
     const s = stateRef.current;
     const now = Date.now();
 
     if (s.phase === "show") {
       const elapsed = now - s.phaseStart;
-      s.showProgress = Math.min(1, elapsed / SHOW_DURATION);
-      if (elapsed >= SHOW_DURATION) {
+      const cfg = ROUND_CONFIG[s.round];
+      s.showProgress = Math.min(1, elapsed / cfg.showMs);
+      if (elapsed >= cfg.showMs) {
         s.phase = "fade";
         s.phaseStart = now;
         s.fadeAlpha = 1;
-        setDisplayPhase("fade");
       }
     } else if (s.phase === "fade") {
       const elapsed = now - s.phaseStart;
-      s.fadeAlpha = Math.max(0, 1 - elapsed / FADE_DURATION);
-      if (elapsed >= FADE_DURATION) {
+      s.fadeAlpha = Math.max(0, 1 - elapsed / FADE_MS);
+      if (elapsed >= FADE_MS) {
         s.phase = "draw";
         s.fadeAlpha = 0;
         s.playerPoints = [];
-        setDisplayPhase("draw");
+        s.phaseStart = now;
+      }
+    } else if (s.phase === "draw") {
+      const elapsed = now - s.phaseStart;
+      if (elapsed >= DRAW_LIMIT_MS && s.playerPoints.length >= 2) {
+        // Auto-score when timer runs out
+        const score = scoreRound(pathsRef.current[s.round], s.playerPoints);
+        s.currentScore = score;
+        s.roundScores = [...s.roundScores, score];
+        s.phase = "score";
+        setPhase("score");
+      } else if (elapsed >= DRAW_LIMIT_MS) {
+        // No drawing — score 0
+        s.currentScore = 0;
+        s.roundScores = [...s.roundScores, 0];
+        s.phase = "score";
+        setPhase("score");
       }
     }
 
@@ -359,27 +478,20 @@ export function GuideGame() {
     return () => cancelAnimationFrame(rafRef.current);
   }, [loop]);
 
-  // ─── Score computation ────────────────────────────────────────────────────
-  const computeScore = useCallback((round: number, playerPts: [number, number][]): number => {
-    if (playerPts.length < 2) return 0;
-    const raphPath = RAPH_PATHS[round];
-    const sampled = samplePath(raphPath, 20);
-    let totalDist = 0;
-    for (const [rx, ry] of sampled) {
-      totalDist += minDistToPolyline(rx, ry, playerPts);
-    }
-    const avgDist = totalDist / sampled.length;
-    return Math.max(0, Math.round(100 - avgDist / 2));
-  }, []);
-
-  // ─── Touch ────────────────────────────────────────────────────────────────
+  // ─── Input helpers ─────────────────────────────────────────────────────────
   const toCanvas = useCallback(
     (e: React.TouchEvent | React.MouseEvent): [number, number] => {
       const canvas = canvasRef.current;
       if (!canvas) return [0, 0];
       const rect = canvas.getBoundingClientRect();
-      const clientX = "touches" in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
-      const clientY = "touches" in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
+      const clientX =
+        "touches" in e
+          ? e.touches[0].clientX
+          : (e as React.MouseEvent).clientX;
+      const clientY =
+        "touches" in e
+          ? e.touches[0].clientY
+          : (e as React.MouseEvent).clientY;
       return [
         (clientX - rect.left) / scale,
         (clientY - rect.top) / scale,
@@ -388,34 +500,48 @@ export function GuideGame() {
     [scale]
   );
 
+  const startGame = useCallback(() => {
+    pathsRef.current = ROUND_CONFIG.map((cfg) => generatePath(cfg.pts));
+    stateRef.current = {
+      ...makeInitState(),
+      phase: "show",
+      phaseStart: Date.now(),
+    };
+    setPhase("show");
+    setDoneData(null);
+  }, []);
+
+  const advanceFromScore = useCallback(() => {
+    const s = stateRef.current;
+    if (s.phase !== "score") return;
+    if (s.round < ROUNDS - 1) {
+      s.round++;
+      s.phase = "show";
+      s.phaseStart = Date.now();
+      s.showProgress = 0;
+      s.fadeAlpha = 1;
+      s.playerPoints = [];
+      setPhase("show");
+    } else {
+      s.phase = "done";
+      setPhase("done");
+      const avg = Math.round(
+        s.roundScores.reduce((a, b) => a + b, 0) / s.roundScores.length
+      );
+      setDoneData({ scores: s.roundScores, avg });
+    }
+  }, []);
+
   const handleTouchStart = useCallback(
     (e: React.TouchEvent) => {
       e.preventDefault();
       const s = stateRef.current;
       if (s.phase === "ready" || s.phase === "done") {
-        stateRef.current = { ...makeInitState(), phase: "show", phaseStart: Date.now() };
-        setDisplayPhase("show");
-        setDisplayRound(0);
+        startGame();
         return;
       }
       if (s.phase === "score") {
-        // Go to next round or done
-        if (s.round < ROUNDS - 1) {
-          const nextRound = s.round + 1;
-          s.round = nextRound;
-          s.phase = "show";
-          s.phaseStart = Date.now();
-          s.showProgress = 0;
-          s.fadeAlpha = 1;
-          s.playerPoints = [];
-          setDisplayPhase("show");
-          setDisplayRound(nextRound);
-        } else {
-          s.phase = "done";
-          setDisplayPhase("done");
-          const total = s.roundScores.reduce((a, b) => a + b, 0);
-          setDisplayScore(Math.round(total / s.roundScores.length));
-        }
+        advanceFromScore();
         return;
       }
       if (s.phase === "draw") {
@@ -423,7 +549,7 @@ export function GuideGame() {
         s.playerPoints = [pos];
       }
     },
-    [toCanvas]
+    [toCanvas, startGame, advanceFromScore]
   );
 
   const handleTouchMove = useCallback(
@@ -431,8 +557,7 @@ export function GuideGame() {
       e.preventDefault();
       const s = stateRef.current;
       if (s.phase !== "draw") return;
-      const pos = toCanvas(e);
-      s.playerPoints.push(pos);
+      s.playerPoints.push(toCanvas(e));
     },
     [toCanvas]
   );
@@ -441,23 +566,26 @@ export function GuideGame() {
     (e: React.TouchEvent) => {
       e.preventDefault();
       const s = stateRef.current;
-      if (s.phase !== "draw") return;
-      if (s.playerPoints.length < 2) return;
-
-      // Score the drawn path
-      const score = computeScore(s.round, s.playerPoints);
+      if (s.phase !== "draw" || s.playerPoints.length < 2) return;
+      const score = scoreRound(pathsRef.current[s.round], s.playerPoints);
       s.currentScore = score;
       s.roundScores = [...s.roundScores, score];
       s.phase = "score";
-      setDisplayPhase("score");
-      setDisplayScore(score);
+      setPhase("score");
     },
-    [computeScore]
+    []
   );
 
   return (
     <div className="flex flex-col items-center">
-      <div style={{ width: W * scale, height: H * scale, position: "relative", overflow: "hidden" }}>
+      <div
+        style={{
+          width: W * scale,
+          height: H * scale,
+          position: "relative",
+          overflow: "hidden",
+        }}
+      >
         <canvas
           ref={canvasRef}
           width={W}
@@ -475,31 +603,63 @@ export function GuideGame() {
           onTouchEnd={handleTouchEnd}
           onClick={(e) => {
             const s = stateRef.current;
-            if (s.phase === "ready" || s.phase === "done") {
-              stateRef.current = { ...makeInitState(), phase: "show", phaseStart: Date.now() };
-              setDisplayPhase("show");
-              setDisplayRound(0);
-            } else if (s.phase === "score") {
-              if (s.round < ROUNDS - 1) {
-                const nextRound = s.round + 1;
-                s.round = nextRound;
-                s.phase = "show";
-                s.phaseStart = Date.now();
-                s.showProgress = 0;
-                s.fadeAlpha = 1;
-                s.playerPoints = [];
-                setDisplayPhase("show");
-                setDisplayRound(nextRound);
-              } else {
-                s.phase = "done";
-                setDisplayPhase("done");
-              }
-            }
+            if (s.phase === "ready" || s.phase === "done") startGame();
+            else if (s.phase === "score") advanceFromScore();
           }}
         />
+
+        {/* Done overlay */}
+        {phase === "done" && doneData && (
+          <div
+            className="absolute inset-0 flex flex-col items-center justify-center bg-alpine-dark/92 animate-[fadeIn_0.35s_ease-out]"
+            onClick={startGame}
+          >
+            <h2 className="font-heading text-4xl text-glacier mb-3">
+              RÉSULTAT FINAL
+            </h2>
+            <div className="space-y-1.5 w-56">
+              {doneData.scores.map((sc, i) => {
+                const color =
+                  sc >= 75
+                    ? "text-summit"
+                    : sc >= 45
+                    ? "text-[#FFE66D]"
+                    : "text-alpen-glow";
+                return (
+                  <div
+                    key={i}
+                    className="flex justify-between bg-alpine-mid/80 rounded-lg px-4 py-2"
+                  >
+                    <span className="text-mist text-sm">
+                      Manche {i + 1}
+                    </span>
+                    <span className={`font-bold text-sm ${color}`}>
+                      {sc} / 100
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-4 text-center">
+              <p className="text-snow font-bold text-3xl">
+                {doneData.avg}
+                <span className="text-mist text-lg font-normal"> / 100</span>
+              </p>
+              <p className="text-mist text-sm mt-1">
+                {doneData.avg >= 70
+                  ? "Tu connais le chemin ! 🏆"
+                  : doneData.avg >= 45
+                  ? "Bonne mémoire !"
+                  : "Raph t'attend encore…"}
+              </p>
+            </div>
+            <p className="text-glacier text-xs mt-5">TAP pour rejouer</p>
+          </div>
+        )}
       </div>
+
       <p className="text-mist text-xs mt-2 text-center px-4">
-        Observe · mémorise · reproduis · {ROUNDS} manches
+        Observe · mémorise · trace en 9s · {ROUNDS} manches
       </p>
     </div>
   );

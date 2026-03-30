@@ -7,10 +7,10 @@ import { submitDvaScore, fetchDvaLeaderboard, type DvaScore } from "@/lib/leader
 // ─── Constants ────────────────────────────────────────────────────────────────
 const W = 375;
 const H = 520;
-const CAPTURE_RADIUS = 30;
-const SIGNAL_RANGE = 220;
-const BURIED_COUNT = 5;
-const TRAIL_MAX = 50;
+const CAPTURE_RADIUS = 18;
+const SIGNAL_RANGE = 210;
+const BURIED_COUNT = 6;
+const TRAIL_MAX = 220;
 const BURIED_PLAYERS = PLAYERS.filter((p) => p.id !== "raph");
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -32,7 +32,7 @@ interface GameState {
   probeActive: boolean;
   startTime: number;
   endTime: number;
-  trail: { x: number; y: number }[];
+  trail: { x: number; y: number; bars: number }[];
   foundFlash: { text: string; x: number; y: number; life: number } | null;
   captureFlash: { x: number; y: number; r: number; life: number } | null;
 }
@@ -65,28 +65,24 @@ function makeInitState(): GameState {
 function getSignal(s: GameState): {
   bars: number;
   dist: number;
-  angle: number;
   nearestId: string | null;
 } {
   const unfound = s.buried.filter((b) => !b.found);
   if (unfound.length === 0 || !s.probeActive)
-    return { bars: 0, dist: Infinity, angle: 0, nearestId: null };
+    return { bars: 0, dist: Infinity, nearestId: null };
 
   let minDist = Infinity;
-  let nearest: BuriedPlayer | null = null;
+  let nearestId: string | null = null;
   for (const b of unfound) {
     const d = Math.hypot(s.probeX - b.x, s.probeY - b.y);
     if (d < minDist) {
       minDist = d;
-      nearest = b;
+      nearestId = b.id;
     }
   }
 
   const bars = Math.max(0, Math.round(5 * (1 - minDist / SIGNAL_RANGE)));
-  const angle = nearest
-    ? Math.atan2(nearest.y - s.probeY, nearest.x - s.probeX)
-    : 0;
-  return { bars, dist: minDist, angle, nearestId: nearest?.id ?? null };
+  return { bars, dist: minDist, nearestId };
 }
 
 // ─── Audio beeper ─────────────────────────────────────────────────────────────
@@ -197,28 +193,56 @@ export function DvaGame() {
       ctx.fill();
     }
 
-    // Subtle snow bumps above unfound buried victims
+    // Snow bumps + ghost outline when very close (signal 5 = ≤ ~42px away)
     if (s.phase === "playing") {
       for (const b of s.buried) {
         if (b.found) continue;
+        // Subtle bump always visible
         const g = ctx.createRadialGradient(b.x, b.y - 6, 2, b.x, b.y, 26);
-        g.addColorStop(0, "rgba(255,255,255,0.42)");
+        g.addColorStop(0, "rgba(255,255,255,0.38)");
         g.addColorStop(1, "rgba(255,255,255,0)");
         ctx.fillStyle = g;
         ctx.beginPath();
         ctx.ellipse(b.x, b.y, 24, 15, 0, 0, Math.PI * 2);
         ctx.fill();
+
+        // Ghost outline — only appears when probe is right on top (signal 5)
+        if (s.probeActive) {
+          const d = Math.hypot(s.probeX - b.x, s.probeY - b.y);
+          if (d < SIGNAL_RANGE / 5) {
+            const ghostAlpha = Math.max(0, (1 - d / (SIGNAL_RANGE / 5)) * 0.55);
+            ctx.save();
+            ctx.globalAlpha = ghostAlpha;
+            ctx.font = "22px serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillStyle = "rgba(255,255,255,0.6)";
+            ctx.fillText(b.emoji, b.x, b.y);
+            ctx.restore();
+          }
+        }
       }
     }
 
-    // Probe trail (fading dots)
+    // Heatmap trail — color by signal strength (blue=cold → red=hot)
+    const HEAT_COLORS = [
+      null,                        // 0 bars: skip
+      "rgba(94,173,212,",          // 1 bar: cold blue
+      "rgba(100,200,220,",         // 2 bars: cyan
+      "rgba(255,230,109,",         // 3 bars: yellow
+      "rgba(232,128,74,",          // 4 bars: orange
+      "rgba(220,60,60,",           // 5 bars: red — very close!
+    ] as const;
     const trail = s.trail;
-    for (let i = 1; i < trail.length; i++) {
-      const alpha = (i / trail.length) * 0.38;
-      const r = 1.5 + (i / trail.length) * 2;
+    for (let i = 0; i < trail.length; i++) {
+      const pt = trail[i];
+      if (pt.bars === 0) continue;
+      const ageFrac = i / trail.length;
+      const alpha = ageFrac * (0.25 + pt.bars * 0.1);
+      const r = 2 + ageFrac * 3 + pt.bars * 0.5;
       ctx.beginPath();
-      ctx.arc(trail[i].x, trail[i].y, r, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(94,173,212,${alpha})`;
+      ctx.arc(pt.x, pt.y, r, 0, Math.PI * 2);
+      ctx.fillStyle = `${HEAT_COLORS[pt.bars]}${alpha})`;
       ctx.fill();
     }
 
@@ -277,20 +301,22 @@ export function DvaGame() {
 
     // DVA Probe
     if (s.phase === "playing" && s.probeActive) {
-      const { bars, dist, angle } = getSignal(s);
+      const { bars, dist } = getSignal(s);
       const color =
-        bars >= 4 ? "#4CAF82" : bars >= 2 ? "#FFE66D" : "#5EADD4";
+        bars >= 4 ? "#DC3C3C" : bars >= 3 ? "#E8804A" : bars >= 2 ? "#FFE66D" : "#5EADD4";
 
-      // Warm glow when close
-      if (bars >= 3) {
+      // Heat glow (stronger when closer)
+      if (bars >= 2) {
+        const glowR = 40 + bars * 8;
         const warmGrad = ctx.createRadialGradient(
-          s.probeX, s.probeY, 12, s.probeX, s.probeY, 60
+          s.probeX, s.probeY, 10, s.probeX, s.probeY, glowR
         );
-        warmGrad.addColorStop(0, `rgba(76,175,130,${bars * 0.045})`);
-        warmGrad.addColorStop(1, "rgba(76,175,130,0)");
+        const glowColor = bars >= 4 ? "220,60,60" : bars >= 3 ? "232,128,74" : "255,230,109";
+        warmGrad.addColorStop(0, `rgba(${glowColor},${bars * 0.04})`);
+        warmGrad.addColorStop(1, `rgba(${glowColor},0)`);
         ctx.fillStyle = warmGrad;
         ctx.beginPath();
-        ctx.arc(s.probeX, s.probeY, 60, 0, Math.PI * 2);
+        ctx.arc(s.probeX, s.probeY, glowR, 0, Math.PI * 2);
         ctx.fill();
       }
 
@@ -303,47 +329,11 @@ export function DvaGame() {
       ctx.lineWidth = 2.5;
       ctx.stroke();
 
-      // Directional arrow pointing toward nearest victim
-      if (bars > 0 && dist < SIGNAL_RANGE) {
-        const arrowLen = 13 + bars * 1.8;
-        const ax = s.probeX + Math.cos(angle) * arrowLen;
-        const ay = s.probeY + Math.sin(angle) * arrowLen;
-        ctx.save();
-        ctx.strokeStyle = color;
-        ctx.fillStyle = color;
-        ctx.lineWidth = 2.5;
-        ctx.lineCap = "round";
-        // Shaft
-        ctx.beginPath();
-        ctx.moveTo(
-          s.probeX + Math.cos(angle) * 7,
-          s.probeY + Math.sin(angle) * 7
-        );
-        ctx.lineTo(ax, ay);
-        ctx.stroke();
-        // Arrowhead
-        ctx.translate(ax, ay);
-        ctx.rotate(angle);
-        ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.lineTo(-8, -4);
-        ctx.lineTo(-8, 4);
-        ctx.closePath();
-        ctx.fill();
-        ctx.restore();
-      }
-
-      // Signal bars inside probe
+      // Signal bars (5 bars = very close)
       for (let i = 0; i < 5; i++) {
         const bh = 3 + i * 1.8;
-        ctx.fillStyle =
-          i < bars ? color : "rgba(255,255,255,0.14)";
-        ctx.fillRect(
-          s.probeX - 11 + i * 5,
-          s.probeY - bh / 2 - 1,
-          4,
-          bh
-        );
+        ctx.fillStyle = i < bars ? color : "rgba(255,255,255,0.14)";
+        ctx.fillRect(s.probeX - 11 + i * 5, s.probeY - bh / 2 - 1, 4, bh);
       }
 
       // Distance label
@@ -395,8 +385,8 @@ export function DvaGame() {
       ctx.font = "15px Inter, sans-serif";
       ctx.fillStyle = "#94A3B8";
       ctx.fillText(`Localise ${BURIED_COUNT} potes ensevelis`, W / 2, H / 2 + 18);
-      ctx.fillText("La flèche indique la direction →", W / 2, H / 2 + 40);
-      ctx.fillText("Plus de barres = plus proche", W / 2, H / 2 + 60);
+      ctx.fillText("Plus de barres = plus proche", W / 2, H / 2 + 40);
+      ctx.fillText("Trace une heatmap 🔵→🟡→🔴 pour guider", W / 2, H / 2 + 60);
 
       ctx.fillStyle = "#5EADD4";
       ctx.font = "bold 22px Inter, sans-serif";
@@ -490,8 +480,8 @@ export function DvaGame() {
           s.phase = "win";
           s.endTime = Date.now();
           stopBeep();
-          const elapsed = Math.floor((s.endTime - s.startTime) / 1000);
-          const score = Math.max(0, 300 - elapsed) * BURIED_COUNT;
+          const elapsed = Math.max(1, Math.floor((s.endTime - s.startTime) / 1000));
+          const score = Math.round(12000 / elapsed) * BURIED_COUNT;
           setPhase("win");
           setWinData({ elapsed, score });
         }
@@ -520,7 +510,8 @@ export function DvaGame() {
       s.probeX = pos.x;
       s.probeY = pos.y;
       s.probeActive = true;
-      s.trail = [pos];
+      const { bars: b0 } = getSignal(s);
+      s.trail = [{ ...pos, bars: b0 }];
       checkCapture(s);
       updateBeep(s);
     },
@@ -536,7 +527,8 @@ export function DvaGame() {
       s.probeX = pos.x;
       s.probeY = pos.y;
       s.probeActive = true;
-      s.trail.push(pos);
+      const { bars: bm } = getSignal(s);
+      s.trail.push({ ...pos, bars: bm });
       if (s.trail.length > TRAIL_MAX) s.trail.shift();
       checkCapture(s);
       updateBeep(s);
@@ -640,8 +632,7 @@ export function DvaGame() {
       </div>
 
       <p className="text-mist text-xs mt-2 text-center px-4">
-        Glisse le doigt · la flèche indique la direction · approche pour
-        capturer
+        Glisse le doigt · heatmap 🔵→🟡→🔴 = signal froid→chaud · approche pour capturer
       </p>
     </div>
   );
